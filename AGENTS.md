@@ -1,6 +1,6 @@
 # OpenCode Go Copilot Provider — AGENTS.md
 
-> **版本**: 0.4.2 | **最后更新**: 2026-05-04  
+> **版本**: 0.4.2 | **最后更新**: 2026-05-05  
 > **所有更改必须通过 `npm run compile` / `npx tsc --noEmit` 编译检查无错误通过。**  
 > **每次更改后，必须同步更新本文档 (`AGENTS.md`) 以反映代码变更。**
 

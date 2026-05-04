@@ -167,8 +167,8 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
             rb.max_tokens = um.max_tokens;
         }
 
-        // OpenAI reasoning configuration
-        if (um?.reasoning_effort !== undefined) {
+        // OpenAI reasoning configuration (only set when thinking is enabled)
+        if (um?.enable_thinking !== false && um?.reasoning_effort !== undefined) {
             rb.reasoning_effort = um.reasoning_effort;
         }
 
