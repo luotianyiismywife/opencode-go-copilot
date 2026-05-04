@@ -36,7 +36,8 @@ Available in `settings.json`:
   "opencodego.commitLanguage": "English",
   "opencodego.commitModel": "deepseek-v4-flash",
   "opencodego.commitMessagePrompt": "",
-  "opencodego.requestTimeout": 600000
+  "opencodego.requestTimeout": 600000,
+  "opencodego.recentCommitsCount": 10
 }
 ```
 
@@ -46,6 +47,7 @@ Available in `settings.json`:
 | `opencodego.commitModel` | `deepseek-v4-flash` | Model ID used for commit generation |
 | `opencodego.commitMessagePrompt` | `""` | Custom system prompt for commit message generation |
 | `opencodego.requestTimeout` | `600000` | Maximum time (ms) for a single API request. Default is 600000 (10 minutes). Increase if long responses time out. |
+| `opencodego.recentCommitsCount` | `10` | Number of recent commits to analyze for style reference when generating commit messages. Set to 0 to disable. |
 
 > All requests use `temperature: 0` for deterministic output.  
 > DeepSeek Thinking variants expose a **Thinking Effort** picker in the model selector with levels `high` and `max` (default: `max`).
@@ -96,7 +98,8 @@ MIT License. This project references code from [oai-compatible-copilot](https://
   "opencodego.commitLanguage": "Chinese (Simplified)",
   "opencodego.commitModel": "deepseek-v4-flash",
   "opencodego.commitMessagePrompt": "",
-  "opencodego.requestTimeout": 600000
+  "opencodego.requestTimeout": 600000,
+  "opencodego.recentCommitsCount": 10
 }
 ```
 
@@ -106,6 +109,7 @@ MIT License. This project references code from [oai-compatible-copilot](https://
 | `opencodego.commitModel` | `deepseek-v4-flash` | 用于生成提交消息的模型 |
 | `opencodego.commitMessagePrompt` | `""` | 生成提交消息的自定义系统提示词 |
 | `opencodego.requestTimeout` | `600000` | 单个 API 请求的最大等待时间（毫秒）。默认 600000（10 分钟）。生成长内容超时时可增大此值。 |
+| `opencodego.recentCommitsCount` | `10` | 生成提交消息时参考的近期提交数量，用于学习仓库提交风格。设为 0 可禁用。 |
 
 > 所有请求使用 `temperature: 0` 以确保输出确定性。  
 > DeepSeek Thinking 变体在模型选择器中提供 **思考深度 (Thinking Effort)** 选项，可选 `high`、`max`（默认 `max`）。

@@ -126,6 +126,13 @@
 					"default": 600000,
 					"minimum": 10000,
 					"description": "%config.requestTimeout.desc%"
+				},
+				"opencodego.recentCommitsCount": {
+					"type": "number",
+					"default": 10,
+					"minimum": 0,
+					"maximum": 50,
+					"description": "%config.recentCommitsCount.desc%"
 				}
 			}
 		}

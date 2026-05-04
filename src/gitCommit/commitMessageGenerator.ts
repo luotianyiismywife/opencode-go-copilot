@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { getGitDiff } from "./gitUtils";
+import { getGitDiff, getRecentCommits } from "./gitUtils";
 import { OpenaiApi } from "../openai/openaiApi";
 import { AnthropicApi } from "../anthropic/anthropicApi";
 import { getBuiltInModelConfig } from "../models";
@@ -16,8 +16,9 @@ let commitGenerationAbortController: AbortController | undefined;
 
 const DEFAULT_PROMPT = {
     system:
-        "You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.\nBased on the provided git diff, generate a conventional format commit message.",
+        "You are a helpful assistant that generates concise, informative git commit messages based on git diffs.\n\nGuidelines:\n- By default, use conventional commit format: <type>(<scope>): <description>\n- If reference commits are provided below, match their style instead\n- Keep the subject line under 72 characters\n- Use the imperative mood (\"add\" not \"added\" / \"adds\")\n- Skip any preamble, explanations, or backticks — output only the commit message\n- If the diff is large, focus on the most important changes",
     user: "Notes from developer (ignore if not relevant): {{USER_CURRENT_INPUT}}",
+    styleReference: "\n\nRecent commit messages in this repository (match their style):\n{{RECENT_COMMITS}}",
 };
 
 export async function generateCommitMsg(secrets: vscode.SecretStorage, scm?: vscode.SourceControl) {
@@ -132,7 +133,7 @@ async function generateCommitMsgForRepository(secrets: vscode.SecretStorage, rep
             title: `Generating commit message for ${repoPath.split(path.sep).pop() || "repository"}...`,
             cancellable: true,
         },
-        () => performCommitMsgGeneration(secrets, gitDiff, inputBox)
+        () => performCommitMsgGeneration(secrets, gitDiff, inputBox, repoPath)
     );
 }
 
@@ -155,7 +156,7 @@ async function ensureApiKey(secrets: vscode.SecretStorage): Promise<string | und
     return apiKey;
 }
 
-async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff: string, inputBox: any) {
+async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff: string, inputBox: any, repoPath?: string) {
     const startTime = Date.now();
     let modelId: string | undefined;
     try {
@@ -163,16 +164,22 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
         const config = vscode.workspace.getConfiguration();
 
         const customSystemPrompt = config.get<string>("opencodego.commitMessagePrompt", "");
-        const PROMPT = {
-            system: customSystemPrompt || DEFAULT_PROMPT.system,
-            user: DEFAULT_PROMPT.user,
-        };
+        let systemPrompt = customSystemPrompt || DEFAULT_PROMPT.system;
+
+        // Fetch recent commits for style reference
+        const recentCommitsCount = config.get<number>("opencodego.recentCommitsCount", 10);
+        if (recentCommitsCount > 0 && repoPath) {
+            const recentCommits = await getRecentCommits(repoPath, recentCommitsCount);
+            if (recentCommits) {
+                systemPrompt += DEFAULT_PROMPT.styleReference.replace("{{RECENT_COMMITS}}", recentCommits);
+            }
+        }
 
         const prompts: string[] = [];
 
         const currentInput = inputBox.value?.trim() || "";
         if (currentInput) {
-            prompts.push(PROMPT.user.replace("{{USER_CURRENT_INPUT}}", currentInput));
+            prompts.push(DEFAULT_PROMPT.user.replace("{{USER_CURRENT_INPUT}}", currentInput));
         }
 
         const truncatedDiff =
@@ -198,7 +205,7 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 
         const commitLanguage = config.get<string>("opencodego.commitLanguage", "English");
 
-        const systemPrompt = PROMPT.system + ` Generate commit message in ${commitLanguage}.`;
+        systemPrompt += ` Generate commit message in ${commitLanguage}.`;
 
         const messages = [{ role: "user", content: prompt }];
 

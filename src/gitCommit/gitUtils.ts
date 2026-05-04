@@ -151,6 +151,40 @@ export async function getGitDiff(repoPath: string): Promise<string | undefined> 
     }
 }
 
+/**
+ * Fetch recent commit subjects to use as style reference.
+ * @param repoPath Repository path
+ * @param count Number of recent commits to fetch
+ * @returns Concatenated commit subjects, one per line
+ */
+export async function getRecentCommits(repoPath: string, count: number): Promise<string> {
+    if (count <= 0) {
+        return "";
+    }
+    try {
+        const isInstalled = await checkGitInstalled();
+        if (!isInstalled) {
+            return "";
+        }
+        const isRepo = await checkGitRepo(repoPath);
+        if (!isRepo) {
+            return "";
+        }
+        if (!(await checkGitRepoHasCommits(repoPath))) {
+            return "";
+        }
+        const { stdout } = await execFileAsync("git", [
+            "log",
+            `-n ${count}`,
+            "--format=%s",
+            "--no-merges",
+        ], { cwd: repoPath, maxBuffer: 1024 * 1024 });
+        return stdout.trim();
+    } catch {
+        return "";
+    }
+}
+
 function limitDiffLines(diff: string, maxLines: number): string {
     const lines = diff.split("\n");
     if (lines.length <= maxLines) {
