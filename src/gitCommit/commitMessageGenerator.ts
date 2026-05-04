@@ -133,7 +133,12 @@ async function generateCommitMsgForRepository(secrets: vscode.SecretStorage, rep
             title: `Generating commit message for ${repoPath.split(path.sep).pop() || "repository"}...`,
             cancellable: true,
         },
-        () => performCommitMsgGeneration(secrets, gitDiff, inputBox, repoPath)
+        (_, token) => {
+            token.onCancellationRequested(() => {
+                commitGenerationAbortController?.abort();
+            });
+            return performCommitMsgGeneration(secrets, gitDiff, inputBox, repoPath);
+        }
     );
 }
 
@@ -218,7 +223,7 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
             : new OpenaiApi(modelId);
 
         commitGenerationAbortController = new AbortController();
-        const stream = apiInstance.createMessage(selectedModel, systemPrompt, messages, baseUrl, apiKey);
+        const stream = apiInstance.createMessage(selectedModel, systemPrompt, messages, baseUrl, apiKey, commitGenerationAbortController.signal);
 
         let response = "";
         for await (const chunk of stream) {

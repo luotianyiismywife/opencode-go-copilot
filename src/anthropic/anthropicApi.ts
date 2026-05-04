@@ -373,7 +373,8 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		systemPrompt: string,
 		messages: { role: string; content: string }[],
 		baseUrl: string,
-		apiKey: string
+		apiKey: string,
+		signal?: AbortSignal
 	): AsyncGenerator<{ type: "text"; text: string }> {
 		// For Anthropic, we need to separate system prompt from messages
 		const anthropicMessages: AnthropicMessage[] = messages.map((m) => ({
@@ -401,6 +402,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			method: "POST",
 			headers,
 			body: JSON.stringify(requestBody),
+			signal,
 		});
 
 		if (!response.ok) {
