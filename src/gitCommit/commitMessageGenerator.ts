@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { getGitDiff, getRecentCommits } from "./gitUtils";
@@ -173,14 +174,40 @@ async function performCommitMsgGeneration(secrets: vscode.SecretStorage, gitDiff
 
         // Fetch recent commits for style reference
         const recentCommitsCount = config.get<number>("opencodego.recentCommitsCount", 10);
+        const includeCommitDiff = config.get<boolean>("opencodego.commitIncludeCommitDiff", false);
         if (recentCommitsCount > 0 && repoPath) {
-            const recentCommits = await getRecentCommits(repoPath, recentCommitsCount);
+            const recentCommits = await getRecentCommits(repoPath, recentCommitsCount, { includeDiff: includeCommitDiff });
             if (recentCommits) {
-                systemPrompt += DEFAULT_PROMPT.styleReference.replace("{{RECENT_COMMITS}}", recentCommits);
+                const styleRef = includeCommitDiff
+                    ? "\n\nRecent commit messages and their changes in this repository (match their style):\n{{RECENT_COMMITS}}"
+                    : DEFAULT_PROMPT.styleReference;
+                systemPrompt += styleRef.replace("{{RECENT_COMMITS}}", recentCommits);
             }
         }
 
         const prompts: string[] = [];
+
+        // Attach AGENTS.md and README.md context
+        const attachContextFiles = config.get<boolean>("opencodego.commitAttachContextFiles", true);
+        if (attachContextFiles && repoPath) {
+            const contextFiles = ["AGENTS.md", "README.md"];
+            for (const fileName of contextFiles) {
+                const filePath = path.join(repoPath, fileName);
+                try {
+                    if (fs.existsSync(filePath)) {
+                        const content = fs.readFileSync(filePath, "utf-8").trim();
+                        if (content) {
+                            const truncated = content.length > 8000
+                                ? content.substring(0, 8000) + "\n\n[Content truncated due to size]"
+                                : content;
+                            prompts.push(`[File: ${fileName}]\n${truncated}`);
+                        }
+                    }
+                } catch {
+                    // Skip files that can't be read
+                }
+            }
+        }
 
         const currentInput = inputBox.value?.trim() || "";
         if (currentInput) {

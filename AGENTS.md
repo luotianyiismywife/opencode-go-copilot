@@ -236,7 +236,9 @@ generateCommitMsg(secrets, scm?)
   │   └── 多个 → QuickPick 选择
   ├── 构建 Prompt:
   │   ├── 系统提示词 (可自定义，强调直接输出不包含解释)
-  │   ├── 最近提交风格参考 (git log --format=%s)
+  │   ├── 最近提交风格参考
+  │   │   ├── 默认: 仅提交标题 (git log --format=%s)
+  │   │   └── 可选: 同时包含每次提交的 diff (opencodego.commitIncludeCommitDiff)
   │   ├── 语言检测: auto 模式时告知模型匹配历史 commit 语言风格
   │   ├── 用户当前输入 (SCM InputBox)
   │   └── Git Diff 内容
@@ -300,7 +302,7 @@ src/
 | `openai/openaiTypes.ts` | ~60 | OpenAI 类型定义 |
 | `anthropic/anthropicApi.ts` | ~400 | Anthropic 格式 API 实现 |
 | `anthropic/anthropicTypes.ts` | ~120 | Anthropic 类型定义 |
-| `gitCommit/commitMessageGenerator.ts` | ~260 | Git 提交消息生成逻辑 |
+| `gitCommit/commitMessageGenerator.ts` | ~280 | Git 提交消息生成逻辑 |
 | `gitCommit/gitUtils.ts` | ~190 | Git 命令封装 |
 | `tokenizer/tokenizerManager.ts` | ~130 | o200k_base 分词器管理 (含 LRU 缓存) |
 | `tokenizer/imageUtils.ts` | ~130 | 图片尺寸解析 (PNG/GIF/JPEG/WebP) |
@@ -796,7 +798,7 @@ Anthropic 请求体。包含 `model`, `messages`, `max_tokens`, `system`, `strea
 确保 API Key 存在。
 
 #### `performCommitMsgGeneration(secrets, gitDiff, inputBox, repoPath?): Promise<void>`
-核心生成逻辑。构建 prompt（含自定义提示词、最近提交风格、用户输入、diff 内容），支持 `auto` 语言模式（由模型根据历史 commit 风格自动推断），创建 API 实例，流式输出提交消息到 InputBox。
+核心生成逻辑。构建 prompt（含自定义提示词、最近提交风格、用户输入、diff 内容），支持 `auto` 语言模式（由模型根据历史 commit 风格自动推断），创建 API 实例，流式输出提交消息到 InputBox。支持通过配置 `opencodego.commitIncludeCommitDiff` 控制风格参考中是否包含历史提交的实际代码变更（默认关闭）。支持通过配置 `opencodego.commitAttachContextFiles`（默认开启）控制是否将仓库根目录的 `AGENTS.md` 和 `README.md` 内容附加到 prompt 中作为额外上下文。
 
 #### `abortCommitGeneration(): void`
 中止提交消息生成。
@@ -827,10 +829,13 @@ Anthropic 请求体。包含 `model`, `messages`, `max_tokens`, `system`, `strea
 搜索 Git 提交记录（支持 hash 回退搜索）。
 
 #### `getGitDiff(repoPath): Promise<string | undefined>`
-获取 Git Diff。优先 staged diff (`git diff --cached`)，回退 unstaged diff (`git diff`)，限制最多 500 行。
+获取 Git Diff。优先 staged diff (`git diff --cached`)，回退 unstaged diff (`git diff`)，使用 `-U1` 减少上下文行数，限制最多 500 行。
 
-#### `getRecentCommits(repoPath, count): Promise<string>`
-获取最近的提交标题作为风格参考。
+#### `interface GetRecentCommitsOptions`
+`{ includeDiff?: boolean; maxDiffLinesPerCommit?: number }` — 获取最近提交的选项。
+
+#### `getRecentCommits(repoPath, count, options?): Promise<string>`
+获取最近的提交标题作为风格参考。可通过 `options.includeDiff` 启用包含每次提交的实际代码变更（diff），通过 `options.maxDiffLinesPerCommit` 控制每个提交 diff 的最大行数（默认 50）。diff 使用 `-U1` 减少上下文行数，避免两处改动之间夹杂不必要的未变更内容。
 
 #### `limitDiffLines(diff, maxLines): string`
 限制 diff 行数，超出时添加截断标记。
