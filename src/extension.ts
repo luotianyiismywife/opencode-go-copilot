@@ -59,43 +59,38 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand("opencodego.setModelPreset", async () => {
             const config = vscode.workspace.getConfiguration();
             const presets = config.get<ModelPreset[]>("opencodego.modelPresets", []);
+            const currentPresetId = config.get<string>("opencodego.modelPreset", "custom");
             const currentTemp = config.get<number | null>("opencodego.temperature", null);
             const currentTopP = config.get<number | null>("opencodego.top_p", null);
 
-            const currentTempStr = currentTemp !== null ? String(currentTemp) : "—";
-            const currentTopPStr = currentTopP !== null ? String(currentTopP) : "";
-
-            // Build preset QuickPick items with embedded presetId for reliable matching
             interface PresetQuickPickItem extends vscode.QuickPickItem {
                 presetId?: string;
             }
 
+            // Mark the currently active preset with " (当前)"
             const presetItems: PresetQuickPickItem[] = presets.map((p) => ({
-                label: `${l10n(p.label)} (${p.temperature})`,
+                label: `${l10n(p.label)} (${p.temperature})${p.id === currentPresetId ? l10n(" (current)") : ""}`,
                 presetId: p.id,
             }));
 
-            const customItem: PresetQuickPickItem = {
-                label: "$(pencil) " + l10n("Custom (manual input temp,top_p)"),
-            };
+            // Mark custom option with current values if active
+            const isCustomActive = currentPresetId === "custom";
+            const customLabel = "$(pencil) " + l10n("Custom (manual input temp,top_p)")
+                + (isCustomActive
+                    ? ` ${l10nFormat("(current, temperature: {0}, top_p: {1})", String(currentTemp ?? "—"), String(currentTopP ?? "—"))}`
+                    : "");
 
-            const statusSuffix = currentTopPStr
-                ? " — " + l10nFormat("Current temp: {0}, top_p: {1}", currentTempStr, currentTopPStr)
-                : " — " + l10nFormat("Current temperature: {0}", currentTempStr);
+            const customItem: PresetQuickPickItem = {
+                label: customLabel,
+            };
 
             const items: PresetQuickPickItem[] = [
                 ...presetItems,
                 { label: "", kind: vscode.QuickPickItemKind.Separator },
                 customItem,
-                {
-                    label: currentTopPStr
-                        ? l10nFormat("Current temp: {0}, top_p: {1}", currentTempStr, currentTopPStr)
-                        : l10nFormat("Current temperature: {0}", currentTempStr),
-                    kind: vscode.QuickPickItemKind.Separator,
-                },
             ];
 
-            const title = l10n("Set Model Preset") + statusSuffix;
+            const title = l10n("Set Model Preset");
 
             const picked = await vscode.window.showQuickPick(items, {
                 title,

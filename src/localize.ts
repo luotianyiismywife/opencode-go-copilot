@@ -60,6 +60,8 @@ const zhCN: Record<string, string> = {
 	"Custom (manual input temp,top_p)": "自定义 (手动输入 温度,top_p)",
 	"Current temp: {0}, top_p: {1}": "当前温度 {0}, top_p {1}",
 	"Current temperature: {0}": "当前温度 {0}",
+	" (current)": " (当前)",
+	"(current, temperature: {0}, top_p: {1})": "(当前, 温度: {0}, top_p: {1})",
 	"Set Model Preset": "设置模型预设",
 	"Select a preset (temp, top_p)": "选择一个档位 (温度, top_p)",
 	"Enter temperature (or temp,top_p)": "输入温度, 或 温度,top_p (温度<=2, top_p<=1)",
