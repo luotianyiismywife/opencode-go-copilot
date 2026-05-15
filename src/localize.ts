@@ -1,9 +1,5 @@
 import * as vscode from "vscode";
 
-/** 英文 fallback 字典：为 l10n key 提供可读的英文文本，避免直接暴露 raw key */
-const en: Record<string, string> = {
-};
-
 const zhCN: Record<string, string> = {
 	// statusBar
 	"Token Count": "Token 计数",
@@ -80,15 +76,10 @@ const zhCN: Record<string, string> = {
  */
 export function l10n(key: string): string {
 	const language = vscode.env.language;
-	// 中文环境：优先返回中文字典，不存在则回退到 key
 	if (language.toLowerCase() === "zh-cn" || language.toLowerCase().startsWith("zh")) {
 		if (zhCN[key]) {
 			return zhCN[key];
 		}
-	}
-	// 非中文环境：优先使用 en 字典中的可读英文文本，回退到 key 本身
-	if (en[key]) {
-		return en[key];
 	}
 	return key;
 }
