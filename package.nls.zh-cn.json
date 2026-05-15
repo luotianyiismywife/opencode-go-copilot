@@ -40,5 +40,5 @@
 	"config.modelPreset.temperature.desc": "温度值 (0.0 - 2.0)。",
 	"config.modelPreset.top_p.desc": "top_p 值 (0.0 - 1.0)。",
 
-	"command.setModelPreset": "设置模型预设（温度, top_p）"
+	"command.setModelPreset": "设置模型温度预设"
 }

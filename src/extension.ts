@@ -75,7 +75,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Mark custom option with current values if active
             const isCustomActive = currentPresetId === "custom";
-            const customLabel = "$(pencil) " + l10n("Custom (manual input temp,top_p)")
+            const customLabel = "$(pencil) " + l10n("Custom (manual input)")
                 + (isCustomActive
                     ? ` ${l10nFormat("(current, temperature: {0}, top_p: {1})", String(currentTemp ?? "—"), String(currentTopP ?? "—"))}`
                     : "");
@@ -94,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             const picked = await vscode.window.showQuickPick(items, {
                 title,
-                placeHolder: l10n("Select a preset (temp, top_p)"),
+                placeHolder: l10n("Select a preset"),
                 ignoreFocusOut: true,
             });
 
@@ -120,8 +120,8 @@ export function activate(context: vscode.ExtensionContext) {
                     ? `${currentTemp},${currentTopP}`
                     : "";
                 const inputValue = await vscode.window.showInputBox({
-                    title: l10n("Enter temperature (or temp,top_p)"),
-                    prompt: l10n("Enter temp,top_p (comma separated), e.g.: 0.7,0.95"),
+                    title: l10n("Enter custom temperature"),
+                    prompt: l10n("Enter a single number for temperature only (<=2), or two comma-separated numbers for temperature and top_p (temp<=2, top_p<=1), e.g.: 0.7 or 0.7,0.95"),
                     value: currentVal,
                     validateInput: (val: string) => {
                         const trimmed = val.trim();

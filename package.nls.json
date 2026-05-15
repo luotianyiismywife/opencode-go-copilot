@@ -40,5 +40,5 @@
 	"config.modelPreset.temperature.desc": "Temperature value (0.0 - 2.0).",
 	"config.modelPreset.top_p.desc": "top_p value (0.0 - 1.0).",
 
-	"command.setModelPreset": "Set Model Preset (temp, top_p)"
+	"command.setModelPreset": "Set Model Temperature Preset"
 }
