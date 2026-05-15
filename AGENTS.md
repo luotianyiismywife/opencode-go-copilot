@@ -106,9 +106,10 @@ activate(context)
   ├── new OpenCodeGoChatModelProvider() ← 创建 Provider 实例
   ├── vscode.lm.registerLanguageModelChatProvider("opencodego", provider)
   ├── 注册命令:
-  │   ├── opencodego.setApiKey           ← 设置 API Key
+  │   ├── opencodego.setApiKey                ← 设置 API Key
   │   ├── opencodego.generateGitCommitMessage ← 生成提交消息
-  │   └── opencodego.abortGitCommitMessage    ← 中止生成
+  │   ├── opencodego.abortGitCommitMessage    ← 中止生成
+  │   └── opencodego.setModelPreset           ← 设置模型预设
   └── 注册 dispose 清理
 ```
 
@@ -125,6 +126,10 @@ provideLanguageModelChatResponse(model, messages, options, progress, token)
   │       ├── "disabled" → 关闭思考（always 模型除外）
   │       ├── "enabled" → 开启思考，使用默认推理力度
   │       ├── "high"/"max" → 开启思考，指定推理力度
+  │
+  ├── 2b. 注入 temperature/top_p（模型预设或自定义设置）
+  │       ├── preset 模式 → 注入预设的 temperature（不传入 top_p，由模型使用默认值）
+  │       └── custom 模式 → 注入用户自定义的 temperature 和 top_p（如有设置）
   │
   ├── 3. 确定 API 模式 (apiMode: "openai" | "anthropic")
   │
@@ -288,24 +293,24 @@ src/
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `extension.ts` | ~175 | 扩展激活/停用，注册 Provider 和 4 条命令 |
-| `provider.ts` | ~370 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程 |
-| `models.ts` | ~205 | 14 个内置模型定义，模型配置查询 |
+| `provider.ts` | ~395 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程 |
+| `models.ts` | ~215 | 14 个内置模型定义，模型配置查询 |
 | `types.ts` | ~95 | `OpenCodeGoModelItem`, `ModelPreset`, `ModelsResponse`, `RetryConfig` 等类型 |
-| `commonApi.ts` | ~300 | `CommonApi<TMessage,TRequestBody>` 抽象基类 |
+| `commonApi.ts` | ~380 | `CommonApi<TMessage,TRequestBody>` 抽象基类 |
 | `provideModel.ts` | ~25 | 模型信息获取 |
 | `provideToken.ts` | ~100 | Token 用量计算 |
-| `utils.ts` | ~220 | 工具函数 (重试、角色映射、工具转换等) |
+| `utils.ts` | ~285 | 工具函数 (重试、角色映射、工具转换等) |
 | `statusBar.ts` | ~140 | 状态栏创建、更新、累计计数器 |
-| `logger.ts` | ~50 | 日志输出 (LogOutputChannel) |
-| `localize.ts` | ~85 | 中英文国际化 |
+| `logger.ts` | ~55 | 日志输出 (LogOutputChannel) |
+| `localize.ts` | ~105 | 中英文国际化 |
 | `versionManager.ts` | ~35 | 扩展版本信息 |
-| `openai/openaiApi.ts` | ~430 | OpenAI 格式 API 实现 (消息转换/请求构建/流式处理) |
-| `openai/openaiTypes.ts` | ~60 | OpenAI 类型定义 |
-| `anthropic/anthropicApi.ts` | ~400 | Anthropic 格式 API 实现 |
-| `anthropic/anthropicTypes.ts` | ~120 | Anthropic 类型定义 |
-| `gitCommit/commitMessageGenerator.ts` | ~280 | Git 提交消息生成逻辑 |
-| `gitCommit/gitUtils.ts` | ~190 | Git 命令封装 |
-| `tokenizer/tokenizerManager.ts` | ~130 | o200k_base 分词器管理 (含 LRU 缓存) |
+| `openai/openaiApi.ts` | ~555 | OpenAI 格式 API 实现 (消息转换/请求构建/流式处理) |
+| `openai/openaiTypes.ts` | ~75 | OpenAI 类型定义 |
+| `anthropic/anthropicApi.ts` | ~475 | Anthropic 格式 API 实现 |
+| `anthropic/anthropicTypes.ts` | ~130 | Anthropic 类型定义 |
+| `gitCommit/commitMessageGenerator.ts` | ~295 | Git 提交消息生成逻辑 |
+| `gitCommit/gitUtils.ts` | ~260 | Git 命令封装 |
+| `tokenizer/tokenizerManager.ts` | ~115 | o200k_base 分词器管理 (含 LRU 缓存) |
 | `tokenizer/imageUtils.ts` | ~130 | 图片尺寸解析 (PNG/GIF/JPEG/WebP) |
 
 ---
@@ -344,7 +349,7 @@ src/
 计算文本或消息的 Token 数量。委托给 `countMessageTokens()`。
 
 #### `provideLanguageModelChatResponse(model, messages, options, progress, token): Promise<void>`
-核心方法：处理聊天请求，流式返回响应。包括模型配置获取、API Key 验证、延迟控制、超时管理、API 路由、流式解析和错误处理。
+核心方法：处理聊天请求，流式返回响应。包括模型配置获取、API Key 验证、推理力度应用、temperature/top_p 注入（模型预设或自定义设置）、延迟控制、超时管理、API 路由、流式解析和错误处理。
 
 #### `private async ensureApiKey(): Promise<string | undefined>`
 确保 API Key 存在于 SecretStorage 中，缺失时弹出输入框提示用户输入。
