@@ -138,28 +138,23 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                 }
             }
 
-            // 温度 & top_p 预设逻辑：优先使用 preset 档位，custom 时使用手动输入值
-            // 用户通过「设置模型预设」命令（setModelPreset）来选择档位或自定义
+            // Inject temperature & top_p from model preset or custom settings
             if (um) {
                 const tempPreset = config.get<string>("opencodego.modelPreset", "custom");
-                if (tempPreset && tempPreset !== "custom") {
-                    // 从 modelPresets 数组中查找匹配 id 的预设值（含 top_p）
+                if (tempPreset !== "custom") {
                     const presets = config.get<ModelPreset[]>("opencodego.modelPresets", []);
                     const matchedPreset = presets.find((p) => p.id === tempPreset);
-                    if (matchedPreset !== undefined && matchedPreset.temperature !== undefined) {
+                    if (matchedPreset) {
                         um.temperature = matchedPreset.temperature;
-                    }
-                    if (matchedPreset !== undefined && matchedPreset.top_p !== undefined) {
                         um.top_p = matchedPreset.top_p;
                     }
                 } else {
-                    // custom 模式：使用手动输入的温度和 top_p
                     const userTemperature = config.get<number | null>("opencodego.temperature", null);
-                    if (userTemperature !== null && userTemperature !== undefined) {
+                    if (userTemperature !== null) {
                         um.temperature = userTemperature;
                     }
                     const userTopP = config.get<number | null>("opencodego.top_p", null);
-                    if (userTopP !== null && userTopP !== undefined) {
+                    if (userTopP !== null) {
                         um.top_p = userTopP;
                     }
                 }
