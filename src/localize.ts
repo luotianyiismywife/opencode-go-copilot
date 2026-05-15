@@ -59,6 +59,19 @@ const zhCN: Record<string, string> = {
 
 	// reasoning effort title (key is English fallback text)
 	"Reasoning Effort": "推理强度",
+
+	// extension.ts - model preset (setModelPreset command)
+	"Custom (manual input temp,top_p)": "自定义（手动输入 温度,top_p）",
+	"Current temp: {0}, top_p: {1}": "当前温度 {0}，top_p {1}",
+	"Set Model Preset": "设置模型预设",
+	"Select a preset (temp, top_p)": "选择一个档位（温度, top_p）",
+	"Enter temperature and top_p": "输入温度和 top_p",
+	"Enter temp,top_p (comma separated), e.g.: 0.7,0.95": "输入 温度,top_p（英文逗号分隔），如：0.7,0.95",
+	"Please enter two numbers separated by a comma": "请输入两个数值，用英文逗号分隔",
+	"Temperature must be between 0.0 and 2.0": "温度必须在 0.0 到 2.0 之间",
+	"top_p must be between 0.0 and 1.0": "top_p 必须在 0.0 到 1.0 之间",
+	"Set to temp: {0}, top_p: {1} ({2})": "已设为 温度 {0}，top_p {1}（{2}）",
+	"Set to temp: {0}, top_p: {1} (custom)": "已设为 温度 {0}，top_p {1}（自定义）",
 };
 
 /**
