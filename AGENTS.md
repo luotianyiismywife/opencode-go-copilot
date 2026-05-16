@@ -1075,7 +1075,50 @@ type 取值：`feat` | `fix` | `refactor` | `docs` | `chore` | `improve` 等。
 - 不包含"如何测试"、"如何回滚"等运维内容，除非用户特别要求
 - 语气精炼、直接，聚焦"改了什么"而非"为什么改"
 
-### 6.4 代码风格
+### 6.4 更新日志内容规范
+
+> **当用户要求生成基于 Git tag 的更新日志（Changelog）时，必须遵循以下格式风格。**
+
+#### 格式模板
+
+```markdown
+### <功能/改动类别标题>
+
+- **<具体功能/改动点标题>**：<详细描述，说明改了什么、为什么、影响范围等>
+- **<下一个具体功能/改动点标题>**：<详细描述>
+- <无标题的简单变更点直接用一句话描述>
+
+### <下一个功能/改动类别标题>
+
+- **<具体功能/改动点标题>**：<详细描述>
+- <简单变更点>
+```
+
+#### 撰写规范
+
+- 以 `###` 三级标题组织 major change areas，标题用中文，概括该类别下的所有变更
+- 每个 change area 下列出具体变更点，用 `-` 项目符号
+- 需要强调的变更点使用 `**<标题>**：<描述>` 格式，无需要强调的简单变更直接用一句话
+- 描述应说明改了什么、为什么改（如有必要）、对用户的影响，聚焦"改了什么"而非罗列 commit 标题
+- 用中文撰写，风格专业、精炼
+- 不包含 `Files Changed` 表格或技术实现细节
+- 按功能类别而非按 commit 时间组织
+
+#### 示例
+
+```markdown
+### Git 提交消息生成增强
+
+- **自动语言检测**：`opencodego.commitLanguage` 新增 `auto` 模式（默认）。启用后模型自动从仓库最近 10 条历史提交中推断使用的语言风格，无需手动指定目标语言。
+- **历史提交代码变更参考**：新增配置项 `opencodego.commitIncludeCommitDiff`（默认关闭）。开启后模型在生成提交消息时会参考历史提交的实际代码变更，帮助模型更好地学习提交风格。
+- **项目背景知识注入**：新增配置项 `opencodego.commitAttachContextFiles`（默认开启）。生成提交消息时自动将 AGENTS.md 和 README.md 内容附加到 prompt 中。
+
+### Diff 生成优化
+
+- **减少上下文行数**：将 diff 上下文从 3 行改为 1 行（`-U1`），避免大量未变更代码混入 prompt 中干扰模型。
+```
+
+### 6.5 代码风格
 
 - 使用 TypeScript 严格模式 (`strict: true`)
 - 遵循 ES2024 标准
@@ -1084,7 +1127,7 @@ type 取值：`feat` | `fix` | `refactor` | `docs` | `chore` | `improve` 等。
 - 导出的函数和类必须显式标注类型
 - 使用 `satisfies` 操作符确保类型安全
 
-### 6.3 命名约定
+### 6.6 命名约定
 
 | 类别 | 约定 | 示例 |
 |------|------|------|
@@ -1097,7 +1140,7 @@ type 取值：`feat` | `fix` | `refactor` | `docs` | `chore` | `improve` 等。
 | 私有属性 | `_` 前缀 | `_lastRequestTime`, `_toolCallBuffers` |
 | 文件 | camelCase | `provider.ts`, `commitMessageGenerator.ts` |
 
-### 6.4 VS Code API 使用约束
+### 6.7 VS Code API 使用约束
 
 - `LanguageModelChatProvider` — 必须实现 `provideLanguageModelChatResponse()` 和 `provideLanguageModelChatInformation()`
 - `LanguageModelResponsePart2` — 使用 `LanguageModelTextPart`、`LanguageModelThinkingPart`、`LanguageModelToolCallPart`
@@ -1105,7 +1148,7 @@ type 取值：`feat` | `fix` | `refactor` | `docs` | `chore` | `improve` 等。
 - `LogOutputChannel` — 用于结构化日志输出
 - `Progress<LanguageModelResponsePart2>` — 用于流式报告响应块
 
-### 6.5 错误处理策略
+### 6.8 错误处理策略
 
 - 网络请求使用 `executeWithRetry()`（默认 3 次重试，指数退避）
 - API 认证失败 → 弹出输入框提示用户输入
@@ -1113,7 +1156,7 @@ type 取值：`feat` | `fix` | `refactor` | `docs` | `chore` | `improve` 等。
 - 流式解析错误 → 记录日志，继续处理（不中断流）
 - 所有未捕获错误由 `provider.ts` 的 `catch` 块统一处理
 
-### 6.6 日志规范
+### 6.9 日志规范
 
 所有日志使用 `logger` 单例，标签格式为 `category.subcategory`：
 - `request.start/end` — 请求开始/结束
