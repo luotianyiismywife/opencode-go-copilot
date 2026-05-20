@@ -7,6 +7,14 @@ import type { ModelPreset } from "./types";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 import { TokenizerManager } from "./tokenizer/tokenizerManager";
 
+// ---- Walkthrough / Welcome constants ----
+
+/** memento key tracking whether the welcome walkthrough has been shown. */
+const WELCOME_SHOWN_KEY = "opencodego.welcomeShown";
+
+/** Walkthrough contribution ID (publisher.extension#walkthroughId). */
+const WALKTHROUGH_ID = "OnesoftQwQ.opencode-go-copilot-provider#opencodeGoGettingStarted";
+
 export function activate(context: vscode.ExtensionContext) {
     // Initialize logger
     logger.init();
@@ -19,6 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register the OpenCode Go provider under the vendor id used in package.json
     vscode.lm.registerLanguageModelChatProvider("opencodego", provider);
+
+    // Helper: check if an API key is stored (without prompting)
+    const hasApiKey = async (): Promise<boolean> => {
+        const key = await context.secrets.get("opencodego.apiKey");
+        return !!key;
+    };
 
     // Management command to configure API key
     context.subscriptions.push(
@@ -41,6 +55,20 @@ export function activate(context: vscode.ExtensionContext) {
             }
             await context.secrets.store("opencodego.apiKey", apiKey.trim());
             vscode.window.showInformationMessage(l10n("OpenCode Go API key saved."));
+        })
+    );
+
+    // Command to open the OpenCode Go website to get an API key
+    context.subscriptions.push(
+        vscode.commands.registerCommand("opencodego.getApiKey", () => {
+            vscode.env.openExternal(vscode.Uri.parse("https://opencode.ai/auth"));
+        })
+    );
+
+    // Command to open extension settings
+    context.subscriptions.push(
+        vscode.commands.registerCommand("opencodego.openSettings", () => {
+            vscode.commands.executeCommand("workbench.action.openSettings", "@ext:OnesoftQwQ.opencode-go-copilot-provider");
         })
     );
 
@@ -168,10 +196,36 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Show welcome walkthrough on first install (when no API key is configured)
+    showWelcomeIfNeeded(context);
+
     // Dispose logger on deactivate
     context.subscriptions.push({
         dispose: () => logger.dispose(),
     });
+}
+
+/**
+ * Show the welcome walkthrough on first activation if no API key is configured.
+ * Once shown (or if a key already exists) the flag is persisted so it won't
+ * reappear after subsequent reloads.
+ */
+async function showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<void> {
+    try {
+        if (context.globalState.get<boolean>(WELCOME_SHOWN_KEY)) {
+            return;
+        }
+        const apiKey = await context.secrets.get("opencodego.apiKey");
+        if (apiKey) {
+            // API key already set — no need to show welcome
+            await context.globalState.update(WELCOME_SHOWN_KEY, true);
+            return;
+        }
+        await vscode.commands.executeCommand("workbench.action.openWalkthrough", WALKTHROUGH_ID, false);
+        await context.globalState.update(WELCOME_SHOWN_KEY, true);
+    } catch (error) {
+        logger.warn("Failed to show welcome walkthrough", { error: String(error) });
+    }
 }
 
 export function deactivate() { }

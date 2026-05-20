@@ -3,6 +3,8 @@
 	"commandCategory": "OpenCodeGo",
 
 	"command.setApiKey": "Set OpenCode Go API Key",
+	"command.getApiKey": "Get OpenCode Go API Key",
+	"command.openSettings": "Open OpenCode Go Settings",
 	"command.generateCommit": "Generate Commit Message with OpenCodeGo",
 	"command.abortCommit": "Generate Commit Message with OpenCodeGo - Stop",
 
@@ -46,5 +48,14 @@
 	"config.visionProxyThinking.desc": "Enable thinking/reasoning when describing images via the vision proxy model.",
 	"config.enableThirdPartyTokenIndicator.desc": "Enable the Advanced Token indicator in the status bar. The native Copilot token indicator always shows. When this is enabled, the extension also shows an advanced token counter in the VS Code status bar. Default: true.",
 
-	"command.setModelPreset": "Set Model Temperature Preset"
+	"command.setModelPreset": "Set Model Temperature Preset",
+
+	"walkthrough.title": "OpenCode Go for Copilot Chat",
+	"walkthrough.description": "Set up OpenCode Go models in Copilot Chat.",
+	"walkthrough.setApiKey.title": "Set your OpenCode Go API key",
+	"walkthrough.setApiKey.description": "[Get an API key](command:opencodego.getApiKey) from opencode.ai.\n[Set API Key](command:opencodego.setApiKey)",
+	"walkthrough.showModels.title": "Show OpenCode Go models",
+	"walkthrough.showModels.description": "If the models are hidden, open VS Code's Language Models manager and show the OpenCode Go models.\n[Open Language Models](command:workbench.action.chat.manage)",
+	"walkthrough.advancedSettings.title": "Explore advanced settings",
+	"walkthrough.advancedSettings.description": "Customize model presets, enable Zen free models, configure vision proxy, and more.\n[Open settings](command:opencodego.openSettings)"
 }

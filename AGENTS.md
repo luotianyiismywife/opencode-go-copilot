@@ -47,6 +47,7 @@
 | **超时控制** | 可配置的请求超时时间（默认 10 分钟） |
 | **立即取消** | 取消请求时通过 `reader.cancel()` 立即中断流式读取，停止后台接收 |
 | **视觉代理配置** | 支持通过设置 `opencodego.visionProxyModel`、`opencodego.visionProxyPrompt`、`opencodego.visionProxyThinking` 配置图片代理所使用的视觉模型、提示词和思考模式 |
+| **安装欢迎页 (Walkthrough)** | 首次安装且未配置 API Key 时自动打开引导向导，指引用户设置 API Key 和打开语言模型管理器。包含 3 个步骤：设置 API Key、显示模型、高级设置。通过 `onStartupFinished` 激活事件确保在 VS Code 启动后立即检测 |
 
 ### 1.3 模型清单
 
@@ -125,16 +126,19 @@
 
 ```
 activate(context)
-  ├── logger.init()                    ← 创建 LogOutputChannel
-  ├── TokenizerManager.initialize()    ← 加载 o200k_base.tiktoken
-  ├── initStatusBar()                  ← 创建状态栏条目
-  ├── new OpenCodeGoChatModelProvider() ← 创建 Provider 实例
+  ├── logger.init()                         ← 创建 LogOutputChannel
+  ├── TokenizerManager.initialize()         ← 加载 o200k_base.tiktoken
+  ├── initStatusBar()                       ← 创建状态栏条目
+  ├── new OpenCodeGoChatModelProvider()      ← 创建 Provider 实例
   ├── vscode.lm.registerLanguageModelChatProvider("opencodego", provider)
   ├── 注册命令:
   │   ├── opencodego.setApiKey                ← 设置 API Key
+  │   ├── opencodego.getApiKey                ← 打开 OpenCode AI 官网获取 Key
+  │   ├── opencodego.openSettings             ← 打开扩展设置页
   │   ├── opencodego.generateGitCommitMessage ← 生成提交消息
   │   ├── opencodego.abortGitCommitMessage    ← 中止生成
   │   └── opencodego.setModelPreset           ← 设置模型预设
+  ├── showWelcomeIfNeeded()                 ← 首次安装时显示欢迎向导
   └── 注册 dispose 清理
 ```
 
@@ -375,15 +379,23 @@ src/
 ├── vision/
 │   ├── types.ts                          # Vision proxy 类型定义
 │   └── imageProxy.ts                     # 图片代理核心 (describe_image)
-└── zen/
-    └── zenModels.ts                      # Zen 免费模型定义与 API 交互
+├── zen/
+│   └── zenModels.ts                      # Zen 免费模型定义与 API 交互
+└── resources/
+    └── walkthrough/                      # 安装欢迎页 (Walkthrough) 文档
+        ├── set-api-key.md                # 步骤 1：设置 API Key
+        ├── set-api-key.nls.zh-cn.md      # 步骤 1 中文版
+        ├── show-models.md                # 步骤 2：显示模型
+        ├── show-models.nls.zh-cn.md      # 步骤 2 中文版
+        ├── advanced-settings.md          # 步骤 3：高级设置
+        └── advanced-settings.nls.zh-cn.md# 步骤 3 中文版
 ```
 
 ### 3.2 文件详细说明
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `extension.ts` | ~175 | 扩展激活/停用，注册 Provider 和 4 条命令 |
+| `extension.ts` | ~210 | 扩展激活/停用，注册 Provider 和 6 条命令，首次安装欢迎页引导 |
 | `provider.ts` | ~670 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程及图片代理第二轮处理 |
 | `models.ts` | ~218 | 14 个内置模型定义，模型配置查询（所有模型声明 `imageInput: true`） |
 | `types.ts` | ~95 | `OpenCodeGoModelItem`, `ModelPreset`, `ModelsResponse`, `RetryConfig` 等类型 |
@@ -414,7 +426,10 @@ src/
 ### 4.1 `src/extension.ts`
 
 #### `activate(context: vscode.ExtensionContext): void`
-扩展激活入口。初始化日志、分词器、状态栏；注册 `LanguageModelChatProvider`；注册四条命令（设置 API Key、生成 Git 提交消息、中止生成、设置模型预设）。
+扩展激活入口。初始化日志、分词器、状态栏；注册 `LanguageModelChatProvider`；注册六条命令（设置 API Key、获取 API Key 网址、打开扩展设置、生成 Git 提交消息、中止生成、设置模型预设）；首次安装时调用 `showWelcomeIfNeeded()` 显示欢迎页引导。
+
+#### `showWelcomeIfNeeded(context: vscode.ExtensionContext): Promise<void>`
+检查是否已显示过欢迎页（通过 `globalState` 的 `WELCOME_SHOWN_KEY` 标记）。如果已标记或已有 API Key，直接返回；否则通过 `workbench.action.openWalkthrough` 命令打开 Walkthrough 页面并标记为已显示。静默处理异常，不阻塞扩展激活。
 
 #### `deactivate(): void`
 扩展停用。清理资源（日志 dispose）。

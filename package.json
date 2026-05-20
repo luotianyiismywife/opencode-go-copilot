@@ -33,6 +33,9 @@
 		"Chat"
 	],
 	"license": "MIT",
+	"activationEvents": [
+		"onStartupFinished"
+	],
 	"contributes": {
 		"languageModelChatProviders": [
 			{
@@ -46,6 +49,16 @@
 				"command": "opencodego.setApiKey",
 				"category": "%commandCategory%",
 				"title": "%command.setApiKey%"
+			},
+			{
+				"command": "opencodego.getApiKey",
+				"category": "%commandCategory%",
+				"title": "%command.getApiKey%"
+			},
+			{
+				"command": "opencodego.openSettings",
+				"category": "%commandCategory%",
+				"title": "%command.openSettings%"
 			},
 			{
 				"command": "opencodego.generateGitCommitMessage",
@@ -63,6 +76,42 @@
 				"command": "opencodego.setModelPreset",
 				"category": "%commandCategory%",
 				"title": "%command.setModelPreset%"
+			}
+		],
+		"walkthroughs": [
+			{
+				"id": "opencodeGoGettingStarted",
+				"title": "%walkthrough.title%",
+				"description": "%walkthrough.description%",
+				"steps": [
+					{
+						"id": "setApiKey",
+						"title": "%walkthrough.setApiKey.title%",
+						"description": "%walkthrough.setApiKey.description%",
+						"media": {
+							"markdown": "resources/walkthrough/set-api-key.md"
+						},
+						"completionEvents": [
+							"onCommand:opencodego.setApiKey"
+						]
+					},
+					{
+						"id": "showModels",
+						"title": "%walkthrough.showModels.title%",
+						"description": "%walkthrough.showModels.description%",
+						"media": {
+							"markdown": "resources/walkthrough/show-models.md"
+						}
+					},
+					{
+						"id": "advancedSettings",
+						"title": "%walkthrough.advancedSettings.title%",
+						"description": "%walkthrough.advancedSettings.description%",
+						"media": {
+							"markdown": "resources/walkthrough/advanced-settings.md"
+						}
+					}
+				]
 			}
 		],
 		"menus": {

@@ -3,6 +3,8 @@
 	"commandCategory": "OpenCodeGo",
 
 	"command.setApiKey": "设置 OpenCode Go API 密钥",
+	"command.getApiKey": "获取 OpenCode Go API 密钥",
+	"command.openSettings": "打开 OpenCode Go 设置",
 	"command.generateCommit": "使用 OpenCodeGo 生成提交消息",
 	"command.abortCommit": "使用 OpenCodeGo 生成提交消息 - 停止",
 
@@ -46,5 +48,14 @@
 	"config.visionProxyThinking.desc": "在视觉代理模型描述图片时启用思考/推理功能。",
 	"config.enableThirdPartyTokenIndicator.desc": "启用高级 Token 指示器。Copilot 原生 Token 指示器始终保持开启。开启后，扩展还会在 VS Code 状态栏中显示高级Token计数器。默认: 开启。",
 
-	"command.setModelPreset": "设置模型温度预设"
+	"command.setModelPreset": "设置模型温度预设",
+
+	"walkthrough.title": "OpenCode Go for Copilot Chat",
+	"walkthrough.description": "在 Copilot Chat 中配置 OpenCode Go 模型。",
+	"walkthrough.setApiKey.title": "设置你的 OpenCode Go API 密钥",
+	"walkthrough.setApiKey.description": "[获取 API 密钥](command:opencodego.getApiKey)。\n[设置 API 密钥](command:opencodego.setApiKey)",
+	"walkthrough.showModels.title": "显示 OpenCode Go 模型",
+	"walkthrough.showModels.description": "如果模型被隐藏，请打开 VS Code 的语言模型管理器并显示 OpenCode Go 模型。\n[打开语言模型管理](command:workbench.action.chat.manage)",
+	"walkthrough.advancedSettings.title": "探索高级设置",
+	"walkthrough.advancedSettings.description": "自定义模型预设、启用 Zen 免费模型、配置视觉代理等。\n[打开设置](command:opencodego.openSettings)"
 }
