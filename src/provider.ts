@@ -552,13 +552,11 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
 
         const config = vscode.workspace.getConfiguration();
         const visionModelId = config.get<string>("opencodego.visionProxyModel", "qwen3.6-plus");
-        const visionPromptSetting = config.get<string>("opencodego.visionProxyPrompt", "");
         // Use the model's specific query as the prompt to the vision model
         // This is the key difference from the old describe_image approach:
         // the model can ask targeted questions ("What color is the button?", "Read the text")
         // instead of always getting a generic description.
-        const userQuery = intercepted.args.query;
-        const visionPrompt = visionPromptSetting || userQuery;
+        const visionPrompt = intercepted.args.query;
 
         // Get the stored image data
         const storedImage = params.api.getStoredImage(intercepted.args.imageIndex);

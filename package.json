@@ -295,11 +295,6 @@
 					"default": "qwen3.6-plus",
 					"description": "%config.visionProxyModel.desc%"
 				},
-				"opencodego.visionProxyPrompt": {
-					"type": "string",
-					"default": "Describe this image in detail. Include visible text, objects, UI elements, people, and relevant context. Do not invent details.",
-					"description": "%config.visionProxyPrompt.desc%"
-				},
 				"opencodego.visionProxyThinking": {
 					"type": "boolean",
 					"default": false,

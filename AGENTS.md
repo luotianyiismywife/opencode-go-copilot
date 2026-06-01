@@ -46,7 +46,7 @@
 | **请求延迟** | 可配置的请求间隔延迟，避免触发 API 限流 |
 | **超时控制** | 可配置的请求超时时间（默认 10 分钟） |
 | **立即取消** | 取消请求时通过 `reader.cancel()` 立即中断流式读取，停止后台接收 |
-| **视觉代理配置** | 支持通过设置 `opencodego.visionProxyModel`、`opencodego.visionProxyPrompt`、`opencodego.visionProxyThinking` 配置图片代理所使用的视觉模型、提示词和思考模式 |
+| **视觉代理配置** | 支持通过设置 `opencodego.visionProxyModel`、`opencodego.visionProxyThinking` 配置图片代理所使用的视觉模型和思考模式 |
 | **安装欢迎页 (Walkthrough)** | 首次安装且未配置 API Key 时自动打开引导向导，指引用户设置 API Key 和打开语言模型管理器。包含 3 个步骤：设置 API Key、显示模型、高级设置。通过 `onStartupFinished` 激活事件确保在 VS Code 启动后立即检测 |
 
 ### 1.3 模型清单
@@ -304,10 +304,9 @@ provideLanguageModelChatResponse(model, messages, options, progress, token)
   │
   ├── 5. provider._handleInterceptedToolCall() 处理
   │      ├── 读取设置: visionProxyModel (默认 qwen3.6-plus)
-  │      │              visionProxyPrompt (自定义提示词，覆盖模型查询)
   │      │              visionProxyThinking (默认 false)
   │      ├── 发出 LanguageModelThinkingPart("Reading image...")
-  │      ├── 使用模型的具体 query（或 visionProxyPrompt）调用 callVisionModel()
+  │      ├── 使用模型的具体 query 调用 callVisionModel()
   │      │   └── 发送图片 + 查询到视觉模型，收集流式回答
   │      ├── 发出 LanguageModelThinkingPart(" done") + 关闭 thinking
   │      └── 构建第二轮消息（assistant tool_call + tool result）
@@ -470,7 +469,7 @@ src/
 核心方法：处理聊天请求，流式返回响应。包括模型配置获取（内置模型 → Zen 模型回退）、API Key 验证、推理力度应用、temperature/top_p 注入（模型预设或自定义设置）、延迟控制、超时管理、API 路由、流式解析、图片代理拦截处理和错误处理。错误处理区分三种情况：用户取消（直接重新抛出原始错误）、超时（友好超时提示）、连接被终止（友好终止提示）。
 
 #### `private async _handleInterceptedToolCall(params): Promise<void>`
-处理图片代理拦截。检测 API 实例的 `interceptedToolCall`，读取设置 `opencodego.visionProxyModel`/`visionProxyPrompt`/`visionProxyThinking`，发出 thinking 指示器，使用模型的具体 query 调用 `callVisionModel()` 获取答案，构建第二轮 API 请求（assistant tool_call + tool result），保留 temperature/reasoning_effort 等原始参数，DeepSeek 兼容注入 `reasoning_content`。
+处理图片代理拦截。检测 API 实例的 `interceptedToolCall`，读取设置 `opencodego.visionProxyModel`/`visionProxyThinking`，发出 thinking 指示器，使用模型的具体 query 调用 `callVisionModel()` 获取答案，构建第二轮 API 请求（assistant tool_call + tool result），保留 temperature/reasoning_effort 等原始参数，DeepSeek 兼容注入 `reasoning_content`。
 
 - 视觉模型调用期间用户取消则跳过第二轮。
 - 构建第二轮前清除第一轮超时定时器，避免误中断。
