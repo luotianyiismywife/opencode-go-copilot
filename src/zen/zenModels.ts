@@ -7,6 +7,7 @@ import { l10n } from "../localize";
 export const ZEN_FREE_MODEL_IDS: readonly string[] = [
     "big-pickle",
     "deepseek-v4-flash-free",
+    "minimax-m3-free",
     "minimax-m2.5-free",
     "mimo-v2.5-free",
     "ring-2.6-1t-free",
@@ -23,7 +24,7 @@ export const ZEN_FREE_MODEL_IDS: readonly string[] = [
  */
 const ZEN_FREE_MODEL_METADATA: Record<
     string,
-    { displayName: string; contextLength: number; vision: boolean; maxTokens: number; thinkingMode: "switchable" | "always"; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }
+    { displayName: string; contextLength: number; vision: boolean; maxTokens: number; thinkingMode: "switchable" | "always" | "adaptive"; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }
 > = {
     "big-pickle": {
         displayName: "Zen/Big Pickle Free",
@@ -47,6 +48,14 @@ const ZEN_FREE_MODEL_METADATA: Record<
         vision: false,
         maxTokens: 32768,
         thinkingMode: "switchable",
+    },
+    "minimax-m3-free": {
+        displayName: "Zen/MiniMax M3 Free",
+        contextLength: 1000000,
+        vision: true,
+        maxTokens: 32768,
+        thinkingMode: "adaptive",
+        defaultReasoningEffort: "adaptive",
     },
     "mimo-v2.5-free": {
         displayName: "Zen/MiMo V2.5 Free",
@@ -139,6 +148,8 @@ function buildModelInfos(modelIds: string[]): LanguageModelChatInformation[] {
         } else {
             if (meta.thinkingMode === "switchable") {
                 enumValues = ["disabled", "enabled"];
+            } else if (meta.thinkingMode === "adaptive") {
+                enumValues = ["disabled", "adaptive"];
             } else {
                 enumValues = ["enabled"];
             }
