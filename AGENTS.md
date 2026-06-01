@@ -56,9 +56,9 @@
 | 系列 | 模型 ID | 视觉 | 推理强度选择器 | API 格式 |
 |------|---------|------|----------------|----------|
 | GLM | `glm-5.1`, `glm-5` | ❌ | `思考`（不支持思考切换） | OpenAI |
-| Kimi | `kimi-k2.5`, `kimi-k2.6` | ✅ | `禁用思考` / `自动` | OpenAI |
-| DeepSeek | `deepseek-v4-pro`, `deepseek-v4-flash` | ❌ | `禁用思考` / `自动` / `高` / `极高` | OpenAI |
-| MiMo | `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5` | mimo-v2-omni ✅ | `禁用思考` / `自动` | OpenAI |
+| Kimi | `kimi-k2.5`, `kimi-k2.6` | ✅ | `禁用思考` / `思考` | OpenAI |
+| DeepSeek | `deepseek-v4-pro`, `deepseek-v4-flash` | ❌ | `禁用思考` / `高` / `极高` | OpenAI |
+| MiMo | `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5` | mimo-v2-omni ✅ | `禁用思考` / `思考` | OpenAI |
 | MiniMax | `minimax-m3`, `minimax-m2.7`, `minimax-m2.5` | ❌ | `禁用思考` / `自动` | OpenAI (m2.7 使用 Anthropic) |
 | Qwen | `qwen3.7-max` | ❌ | `禁用思考` / `自动` | Anthropic |
 | Qwen | `qwen3.6-plus`, `qwen3.5-plus` | ✅ | `禁用思考` / `自动` | Anthropic |
@@ -70,10 +70,10 @@
 | 显示名 | 模型 ID | 视觉 | 推理强度选择器 | API 格式 | 备注 |
 |--------|---------|------|----------------|----------|------|
 | Zen/Big Pickle Free | `big-pickle` | ❌ | `思考`（不支持思考切换） | OpenAI | 限时免费 |
-| Zen/DeepSeek V4 Flash Free | `deepseek-v4-flash-free` | ❌ | `禁用思考` / `自动` / `高` / `极高` | OpenAI | 限时免费 |
-| Zen/MiniMax M2.5 Free | `minimax-m2.5-free` | ❌ | `禁用思考` / `自动` | OpenAI | 限时免费 |
-| Zen/Ring 2.6 1T Free | `ring-2.6-1t-free` | ❌ | `禁用思考` / `自动` | OpenAI | 限时免费 |
-| Zen/Nemotron 3 Super Free | `nemotron-3-super-free` | ❌ | `禁用思考` / `自动` | OpenAI | 限时免费 |
+| Zen/DeepSeek V4 Flash Free | `deepseek-v4-flash-free` | ❌ | `禁用思考` / `高` / `极高` | OpenAI | 限时免费 |
+| Zen/MiniMax M2.5 Free | `minimax-m2.5-free` | ❌ | `禁用思考` / `思考` | OpenAI | 限时免费 |
+| Zen/Ring 2.6 1T Free | `ring-2.6-1t-free` | ❌ | `禁用思考` / `思考` | OpenAI | 限时免费 |
+| Zen/Nemotron 3 Super Free | `nemotron-3-super-free` | ❌ | `禁用思考` / `思考` | OpenAI | 限时免费 |
 
 在模型选择器中，内置模型归入 `OpenCode Go` 分组（`family="OpenCodeGo"`），Zen 免费模型归入 `OpenCode Zen` 分组（`family="OpenCode Zen"`）以作区分。
 
@@ -496,7 +496,7 @@ src/
 16 个内置模型定义常量数组。
 
 #### `getBuiltInModelInfos(): LanguageModelChatInformation[]`
-将内置模型定义转换为 VS Code 的模型信息列表。每个模型注册**一个条目**，带 `isUserSelectable: true` 确保在模型选择器中可见（VS Code 1.120+ 要求），并通过 `configurationSchema` 附加推理强度选择器（中文标签）。switchable 模型显示 `禁用思考/自动/思考` 或 `禁用思考/自动/高/最大`（可关闭推理）；adaptive 模型仅显示 `禁用思考/自动`；always 模型不显示 `禁用思考` 选项，仅在支持推理强度时显示强度选项。
+将内置模型定义转换为 VS Code 的模型信息列表。每个模型注册**一个条目**，带 `isUserSelectable: true` 确保在模型选择器中可见（VS Code 1.120+ 要求），并通过 `configurationSchema` 附加推理强度选择器（中文标签）。switchable 模型显示 `禁用思考/思考` 或 `禁用思考/高/最大`（可关闭推理）；adaptive 模型仅显示 `禁用思考/自动`；always 模型不显示 `禁用思考` 选项，仅在支持推理强度时显示强度选项。
 
 #### `getBuiltInModelCount(): number`
 返回内置模型定义总数（BUILT_IN_MODELS.length）。
