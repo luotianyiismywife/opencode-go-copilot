@@ -108,13 +108,13 @@ export function getBuiltInModelInfos(): LanguageModelChatInformation[] {
         let enumValues: string[];
         if (hasEfforts) {
             if (def.thinkingMode === "switchable") {
-                enumValues = ["disabled", ...def.supportedReasoningEfforts!];
+                enumValues = ["disabled", "adaptive", ...def.supportedReasoningEfforts!];
             } else {
                 enumValues = [...def.supportedReasoningEfforts!];
             }
         } else {
             if (def.thinkingMode === "switchable") {
-                enumValues = ["disabled", "enabled"];
+                enumValues = ["disabled", "adaptive", "enabled"];
             } else {
                 enumValues = ["enabled"];
             }
@@ -125,6 +125,7 @@ export function getBuiltInModelInfos(): LanguageModelChatInformation[] {
         const getLabel = (e: string): string => {
             switch (e) {
                 case 'disabled': return l10n("Disabled");
+                case 'adaptive': return l10n("Adaptive");
                 case 'enabled': return l10n("Thinking");
                 case 'low': return l10n("Low");
                 case 'medium': return l10n("Medium");
@@ -136,6 +137,7 @@ export function getBuiltInModelInfos(): LanguageModelChatInformation[] {
         const getDesc = (e: string): string => {
             switch (e) {
                 case 'disabled': return l10n("Do not enable thinking");
+                case 'adaptive': return l10n("Automatically decide when to think");
                 case 'enabled': return l10n("Enable thinking");
                 case 'low': return l10n("Reduce thinking, faster response");
                 case 'medium': return l10n("Balance thinking and speed");

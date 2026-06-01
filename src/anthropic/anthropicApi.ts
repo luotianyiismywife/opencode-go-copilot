@@ -225,6 +225,16 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			rb.top_k = um.top_k;
 		}
 
+		// Add thinking mode (Anthropic-compatible format)
+		// Only set when thinking is enabled; omit when disabled to avoid sending invalid values
+		if (um?.enable_thinking === true) {
+			if (um?.reasoning_effort === 'adaptive') {
+				rb.thinking = { type: "adaptive" };
+			} else {
+				rb.thinking = { type: "enabled", budget_tokens: 8192 };
+			}
+		}
+
 		// Add tools configuration
 		const toolConfig = convertToolsToOpenAI(options);
 		const anthropicToolList: Array<{ name: string; description?: string; input_schema?: object }> = [];

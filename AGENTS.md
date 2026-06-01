@@ -56,12 +56,12 @@
 | 系列 | 模型 ID | 视觉 | 推理强度选择器 | API 格式 |
 |------|---------|------|----------------|----------|
 | GLM | `glm-5.1`, `glm-5` | ❌ | `思考`（不支持思考切换） | OpenAI |
-| Kimi | `kimi-k2.5`, `kimi-k2.6` | ✅ | `禁用思考` / `思考` | OpenAI |
-| DeepSeek | `deepseek-v4-pro`, `deepseek-v4-flash` | ❌ | `禁用思考` / `高` / `极高` | OpenAI |
-| MiMo | `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5` | mimo-v2-omni ✅ | `禁用思考` / `思考` | OpenAI |
-| MiniMax | `minimax-m3`, `minimax-m2.7`, `minimax-m2.5` | ❌ | `禁用思考` / `思考` | OpenAI (m2.7/m3 使用 Anthropic) |
-| Qwen | `qwen3.7-max` | ❌ | `禁用思考` / `思考` | Anthropic |
-| Qwen | `qwen3.6-plus`, `qwen3.5-plus` | ✅ | `禁用思考` / `思考` | Anthropic |
+| Kimi | `kimi-k2.5`, `kimi-k2.6` | ✅ | `禁用思考` / `自动` / `思考` | OpenAI |
+| DeepSeek | `deepseek-v4-pro`, `deepseek-v4-flash` | ❌ | `禁用思考` / `自动` / `高` / `极高` | OpenAI |
+| MiMo | `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5` | mimo-v2-omni ✅ | `禁用思考` / `自动` / `思考` | OpenAI |
+| MiniMax | `minimax-m3`, `minimax-m2.7`, `minimax-m2.5` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI (m2.7/m3 使用 Anthropic) |
+| Qwen | `qwen3.7-max` | ❌ | `禁用思考` / `自动` / `思考` | Anthropic |
+| Qwen | `qwen3.6-plus`, `qwen3.5-plus` | ✅ | `禁用思考` / `自动` / `思考` | Anthropic |
 
 #### OpenCode Zen 免费模型（可选）
 
@@ -70,15 +70,15 @@
 | 显示名 | 模型 ID | 视觉 | 推理强度选择器 | API 格式 | 备注 |
 |--------|---------|------|----------------|----------|------|
 | Zen/Big Pickle Free | `big-pickle` | ❌ | `思考`（不支持思考切换） | OpenAI | 限时免费 |
-| Zen/DeepSeek V4 Flash Free | `deepseek-v4-flash-free` | ❌ | `禁用思考` / `高` / `极高` | OpenAI | 限时免费 |
-| Zen/MiniMax M2.5 Free | `minimax-m2.5-free` | ❌ | `禁用思考` / `思考` | OpenAI | 限时免费 |
-| Zen/Ring 2.6 1T Free | `ring-2.6-1t-free` | ❌ | `禁用思考` / `思考` | OpenAI | 限时免费 |
-| Zen/Nemotron 3 Super Free | `nemotron-3-super-free` | ❌ | `禁用思考` / `思考` | OpenAI | 限时免费 |
+| Zen/DeepSeek V4 Flash Free | `deepseek-v4-flash-free` | ❌ | `禁用思考` / `自动` / `高` / `极高` | OpenAI | 限时免费 |
+| Zen/MiniMax M2.5 Free | `minimax-m2.5-free` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI | 限时免费 |
+| Zen/Ring 2.6 1T Free | `ring-2.6-1t-free` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI | 限时免费 |
+| Zen/Nemotron 3 Super Free | `nemotron-3-super-free` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI | 限时免费 |
 
 在模型选择器中，内置模型归入 `OpenCode Go` 分组（`family="OpenCodeGo"`），Zen 免费模型归入 `OpenCode Zen` 分组（`family="OpenCode Zen"`）以作区分。
 
 > 所有模型在模型选择器中均显示**一个条目**，通过**推理强度选择器**（中文标签）切换思考模式。  
-> - `thinkingMode="switchable"`：用户可选择`禁用思考`或启用思考（强度可配置）  
+> - `thinkingMode="switchable"`：用户可选择`禁用思考`、`自动`或启用思考（强度可配置）  
 > - `thinkingMode="always"`：推理始终启用，选择器中不显示`禁用思考`选项（模型特性）  
 > 
 > **关于图像输入：** 所有模型（包括非视觉模型）的 `imageInput` 能力均声明为 `true`，以确保 VS Code 始终传递图片数据。非视觉模型通过内部的 `describe_image` 工具代理机制处理图片，不直接支持视觉输入。
@@ -155,6 +155,7 @@ provideLanguageModelChatResponse(model, messages, options, progress, token)
   │
   ├── 2. 应用用户配置的 reasoningEffort
   │       ├── "disabled" → 关闭思考（always 模型除外）
+  │       ├── "adaptive" → 开启思考，自动模式（发送 thinking: { type: "adaptive" }）
   │       ├── "enabled" → 开启思考，使用默认推理力度
   │       ├── "high"/"max" → 开启思考，指定推理力度
   │
@@ -492,7 +493,7 @@ src/
 16 个内置模型定义常量数组。
 
 #### `getBuiltInModelInfos(): LanguageModelChatInformation[]`
-将内置模型定义转换为 VS Code 的模型信息列表。每个模型注册**一个条目**，带 `isUserSelectable: true` 确保在模型选择器中可见（VS Code 1.120+ 要求），并通过 `configurationSchema` 附加推理强度选择器（中文标签）。switchable 模型显示 `禁用思考/思考` 或 `禁用思考/高/最大`（可关闭推理）；always 模型不显示 `禁用思考` 选项，仅在支持推理强度时显示强度选项。
+将内置模型定义转换为 VS Code 的模型信息列表。每个模型注册**一个条目**，带 `isUserSelectable: true` 确保在模型选择器中可见（VS Code 1.120+ 要求），并通过 `configurationSchema` 附加推理强度选择器（中文标签）。switchable 模型显示 `禁用思考/自动/思考` 或 `禁用思考/自动/高/最大`（可关闭推理）；always 模型不显示 `禁用思考` 选项，仅在支持推理强度时显示强度选项。
 
 #### `getBuiltInModelCount(): number`
 返回内置模型定义总数（BUILT_IN_MODELS.length）。
@@ -846,7 +847,7 @@ describe_image 工具定义的 OpenAI 格式（`type: "function"`），包含参
 将 VS Code 消息转换为 OpenAI 格式。支持文本、图片、工具调用、工具结果、推理内容的消息转换。modelConfig 新增 `vision` 字段，非视觉模型时自动替换图片为文本引用并存储图片数据。
 
 #### `prepareRequestBody(rb, um?, options?): Record<string, unknown>`
-构建 OpenAI 请求体。设置 temperature、top_p、max_tokens、reasoning_effort、thinking 模式、stop、tools、tool_choice 以及各种惩罚参数和 extra 参数。非视觉模型且存在图片时自动注入 `describe_image` 工具定义。
+构建 OpenAI 请求体。设置 temperature、top_p、max_tokens、reasoning_effort（adaptive 模式时跳过）、thinking 模式（支持 `{ type: "enabled" }` 和 `{ type: "adaptive" }`）、stop、tools、tool_choice 以及各种惩罚参数和 extra 参数。非视觉模型且存在图片时自动注入 `describe_image` 工具定义。
 
 #### `processStreamingResponse(responseBody, progress, token): Promise<void>`
 处理 OpenAI SSE 流式响应。逐行解析 `data:` 前缀的 SSE 事件，处理 `[DONE]` 标记，解析 usage 用量信息，委托 `processDelta()`。注册取消回调：`token.onCancellationRequested` 时调用 `reader.cancel()` 立即中断流式读取。
@@ -910,7 +911,7 @@ Anthropic 请求体。包含 `model`, `messages`, `max_tokens`, `system`, `strea
 将 VS Code 消息转换为 Anthropic 格式。系统消息提取到 `_systemContent`。支持文本、图片、工具使用、工具结果、推理内容。使用 `content` 块数组格式。modelConfig 新增 `vision` 字段，非视觉模型时自动替换图片为文本引用并存储图片数据。
 
 #### `prepareRequestBody(rb, um?, options?): AnthropicRequestBody`
-构建 Anthropic 请求体。设置 max_tokens、system、temperature、top_p、top_k、tools（转换为 Anthropic 格式）、tool_choice（auto/any/none）以及 extra 参数。非视觉模型且存在图片时自动注入 `describe_image` 工具定义。
+构建 Anthropic 请求体。设置 max_tokens、system、temperature、top_p、top_k、thinking 模式（支持 `{ type: "enabled" }` 和 `{ type: "adaptive" }`）、tools（转换为 Anthropic 格式）、tool_choice（auto/any/none）以及 extra 参数。非视觉模型且存在图片时自动注入 `describe_image` 工具定义。
 
 #### `processStreamingResponse(responseBody, progress, token): Promise<void>`
 处理 Anthropic SSE 流式响应。逐行解析 `data:` 前缀的 SSE 事件，委托 `processAnthropicChunk()`。注册取消回调：`token.onCancellationRequested` 时调用 `reader.cancel()` 立即中断流式读取。

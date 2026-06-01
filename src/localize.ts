@@ -40,6 +40,7 @@ const zhCN: Record<string, string> = {
 
 	// reasoning effort labels (keys are English fallback text)
 	"Disabled": "禁用思考",
+	"Adaptive": "自动",
 	"Thinking": "思考",
 	"Low": "低",
 	"Medium": "中",
@@ -48,6 +49,7 @@ const zhCN: Record<string, string> = {
 
 	// reasoning effort descriptions (keys are English fallback text)
 	"Do not enable thinking": "不启用思考",
+	"Automatically decide when to think": "自动决定何时思考",
 	"Enable thinking": "启用思考",
 	"Reduce thinking, faster response": "减少思考，响应更快",
 	"Balance thinking and speed": "平衡思考与速度",

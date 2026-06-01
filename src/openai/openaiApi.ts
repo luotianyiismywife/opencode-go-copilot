@@ -215,15 +215,20 @@ export class OpenaiApi extends CommonApi<OpenAIChatMessage, Record<string, unkno
         }
 
         // OpenAI reasoning configuration (only set when thinking is enabled)
-        if (um?.enable_thinking !== false && um?.reasoning_effort !== undefined) {
+        // Skip reasoning_effort for "adaptive" — it's not a standard API value
+        if (um?.enable_thinking !== false && um?.reasoning_effort !== undefined && um.reasoning_effort !== 'adaptive') {
             rb.reasoning_effort = um.reasoning_effort;
         }
 
         // Thinking mode (OpenAI-compatible format: {"thinking": {"type": "enabled"}})
         if (um?.enable_thinking === true) {
-            rb.thinking = { type: "enabled" };
-            if (um?.thinking_budget !== undefined) {
-                (rb.thinking as Record<string, unknown>).budget_tokens = um.thinking_budget;
+            if (um?.reasoning_effort === 'adaptive') {
+                rb.thinking = { type: "adaptive" };
+            } else {
+                rb.thinking = { type: "enabled" };
+                if (um?.thinking_budget !== undefined) {
+                    (rb.thinking as Record<string, unknown>).budget_tokens = um.thinking_budget;
+                }
             }
         } else {
             rb.thinking = { type: "disabled" };
