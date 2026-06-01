@@ -285,6 +285,7 @@ provideLanguageModelChatResponse(model, messages, options, progress, token)
   ├── 1. convertMessages()
   │      模型 vision=false，有 image → 替换为 "[The user sent an image (imageIndex=N)... I MUST call the ask_image tool...]"
   │      原图数据存入 CommonApi.storedImages 静态池
+  │      同时递归扫描 tool result 内嵌的图片一并存入
   │      记录 _hasStoredImages = true，保存 _originalApiMessages
   │
   ├── 2. prepareRequestBody()
@@ -847,7 +848,7 @@ ask_image 工具定义的 OpenAI 格式（`type: "function"`），包含 `imageI
 构造函数，传入模型 ID。
 
 #### `convertMessages(messages, modelConfig): OpenAIChatMessage[]`
-将 VS Code 消息转换为 OpenAI 格式。支持文本、图片、工具调用、工具结果、推理内容的消息转换。modelConfig 新增 `vision` 字段，非视觉模型时自动替换图片为文本引用并存储图片数据。
+将 VS Code 消息转换为 OpenAI 格式。支持文本、图片、工具调用、工具结果、推理内容的消息转换。modelConfig 新增 `vision` 字段，非视觉模型时自动替换图片为文本引用并存储图片数据。同时递归扫描 `LanguageModelToolResultPart.content` 中的图片一并存入（确保通过工具返回的图片也能被 `ask_image` 代理识别）。
 
 #### `prepareRequestBody(rb, um?, options?): Record<string, unknown>`
 构建 OpenAI 请求体。设置 temperature、top_p、max_tokens、reasoning_effort（adaptive 模式时跳过）、thinking 模式（支持 `{ type: "enabled" }` 和 `{ type: "adaptive" }`）、stop、tools、tool_choice 以及各种惩罚参数和 extra 参数。非视觉模型且存在图片时自动注入 `ask_image` 工具定义。
@@ -911,7 +912,7 @@ Anthropic 请求体。包含 `model`, `messages`, `max_tokens`, `system`, `strea
 构造函数，传入模型 ID。
 
 #### `convertMessages(messages, modelConfig): AnthropicMessage[]`
-将 VS Code 消息转换为 Anthropic 格式。系统消息提取到 `_systemContent`。支持文本、图片、工具使用、工具结果、推理内容。使用 `content` 块数组格式。modelConfig 新增 `vision` 字段，非视觉模型时自动替换图片为文本引用并存储图片数据。
+将 VS Code 消息转换为 Anthropic 格式。系统消息提取到 `_systemContent`。支持文本、图片、工具使用、工具结果、推理内容。使用 `content` 块数组格式。modelConfig 新增 `vision` 字段，非视觉模型时自动替换图片为文本引用并存储图片数据。同时递归扫描 `AnthropicToolResultBlock.content` 中的图片一并存入（确保通过工具返回的图片也能被 `ask_image` 代理识别）。
 
 #### `prepareRequestBody(rb, um?, options?): AnthropicRequestBody`
 构建 Anthropic 请求体。设置 max_tokens、system、temperature、top_p、top_k、thinking 模式（支持 `{ type: "enabled" }` 和 `{ type: "adaptive" }`）、tools（转换为 Anthropic 格式）、tool_choice（auto/any/none）以及 extra 参数。非视觉模型且存在图片时自动注入 `ask_image` 工具定义。
