@@ -24,7 +24,7 @@ export const ZEN_FREE_MODEL_IDS: readonly string[] = [
  */
 const ZEN_FREE_MODEL_METADATA: Record<
     string,
-    { displayName: string; contextLength: number; vision: boolean; maxTokens: number; thinkingMode: "switchable" | "always" | "adaptive"; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }
+    { displayName: string; contextLength: number; vision: boolean; maxTokens: number; thinkingMode: "switchable" | "always" | "adaptive"; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string; apiMode?: "openai" | "anthropic" }
 > = {
     "big-pickle": {
         displayName: "Zen/Big Pickle Free",
@@ -49,6 +49,7 @@ const ZEN_FREE_MODEL_METADATA: Record<
         maxTokens: 32768,
         thinkingMode: "adaptive",
         defaultReasoningEffort: "adaptive",
+        apiMode: "anthropic",
     },
     "mimo-v2.5-free": {
         displayName: "Zen/MiMo V2.5 Free",
@@ -261,7 +262,7 @@ export function getZenFreeModelConfig(modelId: string): OpenCodeGoModelItem | un
         vision: meta.vision,
         context_length: meta.contextLength,
         max_completion_tokens: meta.maxTokens,
-        apiMode: "openai",
+        apiMode: meta.apiMode ?? "openai",
         enable_thinking: true,
         include_reasoning_in_request: true,
         thinkingMode: meta.thinkingMode,
