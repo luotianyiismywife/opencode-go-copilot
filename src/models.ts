@@ -61,9 +61,9 @@ const BUILT_IN_MODELS: BuiltInModelDef[] = [
 
     // ── MiniMax series ── 官方文档: M2.7/M2.5 204800 context (204.8K), M3 1M context ──
     // Note: minimax-m2.7 and minimax-m3 use Anthropic API format (messages endpoint)
-    { baseId: "minimax-m3", displayName: "MiniMax M3", vision: false, thinkingMode: "adaptive", apiMode: "openai", extra: { reasoning_split: true }, contextLength: 1000000, maxTokens: 32768 },
+    { baseId: "minimax-m3", displayName: "MiniMax M3", vision: false, thinkingMode: "adaptive", apiMode: "anthropic", extra: { reasoning_split: true }, contextLength: 1000000, maxTokens: 32768 },
     { baseId: "minimax-m2.7", displayName: "MiniMax M2.7", vision: false, thinkingMode: "always", apiMode: "anthropic", extra: { reasoning_split: true }, contextLength: 204800, maxTokens: 32768 },
-    { baseId: "minimax-m2.5", displayName: "MiniMax M2.5", vision: false, thinkingMode: "always", contextLength: 204800, maxTokens: 32768 },
+    { baseId: "minimax-m2.5", displayName: "MiniMax M2.5", vision: false, thinkingMode: "always", apiMode: "anthropic", contextLength: 204800, maxTokens: 32768 },
 
     // ── Qwen series ── 阿里云百炼: Qwen3.7-Max 1M context, Qwen3.6-Plus 1M context, Qwen3.5-Plus 同代同规格 ──
     // Note: Qwen 系列使用 Anthropic API 格式 (messages endpoint)
