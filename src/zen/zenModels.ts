@@ -123,6 +123,10 @@ function buildModelInfos(modelIds: string[]): LanguageModelChatInformation[] {
         }
 
         // Build reasoning effort enum based on thinking mode
+        // - "switchable" + hasEfforts: disabled / adaptive / [effort levels]
+        // - "switchable" + no efforts: disabled / adaptive  (adaptive replaces "enabled" because it covers the same need)
+        // - "always"    + hasEfforts: [effort levels]
+        // - "always"    + no efforts: enabled
         const hasEfforts = meta.supportedReasoningEfforts && meta.supportedReasoningEfforts.length > 0;
         let enumValues: string[];
         if (hasEfforts) {
@@ -133,7 +137,7 @@ function buildModelInfos(modelIds: string[]): LanguageModelChatInformation[] {
             }
         } else {
             if (meta.thinkingMode === "switchable") {
-                enumValues = ["disabled", "adaptive", "enabled"];
+                enumValues = ["disabled", "adaptive"];
             } else {
                 enumValues = ["enabled"];
             }

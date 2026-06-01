@@ -12,8 +12,8 @@ interface BuiltInModelDef {
     displayName: string;
     /** Whether the model supports image input */
     vision: boolean;
-    /** Thinking mode: "switchable" = two variants registered, "always" = thinking forced on */
-    thinkingMode: "switchable" | "always";
+    /** Thinking mode: "switchable" = user can toggle, "always" = thinking forced on, "adaptive" = only disabled/adaptive */
+    thinkingMode: "switchable" | "always" | "adaptive";
     /** Default reasoning effort when thinking is enabled */
     defaultReasoningEffort?: string;
     /** Supported reasoning effort levels for the model picker UI */
@@ -61,7 +61,7 @@ const BUILT_IN_MODELS: BuiltInModelDef[] = [
 
     // ── MiniMax series ── 官方文档: M2.7/M2.5 204800 context (204.8K), M3 1M context ──
     // Note: minimax-m2.7 and minimax-m3 use Anthropic API format (messages endpoint)
-    { baseId: "minimax-m3", displayName: "MiniMax M3", vision: false, thinkingMode: "switchable", apiMode: "anthropic", extra: { reasoning_split: true }, contextLength: 1000000, maxTokens: 32768 },
+    { baseId: "minimax-m3", displayName: "MiniMax M3", vision: false, thinkingMode: "adaptive", apiMode: "openai", extra: { reasoning_split: true }, contextLength: 1000000, maxTokens: 32768 },
     { baseId: "minimax-m2.7", displayName: "MiniMax M2.7", vision: false, thinkingMode: "always", apiMode: "anthropic", extra: { reasoning_split: true }, contextLength: 204800, maxTokens: 32768 },
     { baseId: "minimax-m2.5", displayName: "MiniMax M2.5", vision: false, thinkingMode: "always", contextLength: 204800, maxTokens: 32768 },
 
@@ -104,6 +104,11 @@ export function getBuiltInModelInfos(): LanguageModelChatInformation[] {
         };
 
         // Build enum values based on thinking mode
+        // - "switchable" + hasEfforts: disabled / adaptive / [effort levels]   (e.g. disabled/adaptive/high/max)
+        // - "switchable" + no efforts: disabled / adaptive
+        // - "adaptive"               : disabled / adaptive                    (only two: off or auto-decide)
+        // - "always"    + hasEfforts: [effort levels]
+        // - "always"    + no efforts: enabled
         const hasEfforts = def.supportedReasoningEfforts && def.supportedReasoningEfforts.length > 0;
         let enumValues: string[];
         if (hasEfforts) {
@@ -114,7 +119,9 @@ export function getBuiltInModelInfos(): LanguageModelChatInformation[] {
             }
         } else {
             if (def.thinkingMode === "switchable") {
-                enumValues = ["disabled", "adaptive", "enabled"];
+                enumValues = ["disabled", "adaptive"];
+            } else if (def.thinkingMode === "adaptive") {
+                enumValues = ["disabled", "adaptive"];
             } else {
                 enumValues = ["enabled"];
             }

@@ -56,12 +56,12 @@
 | 系列 | 模型 ID | 视觉 | 推理强度选择器 | API 格式 |
 |------|---------|------|----------------|----------|
 | GLM | `glm-5.1`, `glm-5` | ❌ | `思考`（不支持思考切换） | OpenAI |
-| Kimi | `kimi-k2.5`, `kimi-k2.6` | ✅ | `禁用思考` / `自动` / `思考` | OpenAI |
+| Kimi | `kimi-k2.5`, `kimi-k2.6` | ✅ | `禁用思考` / `自动` | OpenAI |
 | DeepSeek | `deepseek-v4-pro`, `deepseek-v4-flash` | ❌ | `禁用思考` / `自动` / `高` / `极高` | OpenAI |
-| MiMo | `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5` | mimo-v2-omni ✅ | `禁用思考` / `自动` / `思考` | OpenAI |
-| MiniMax | `minimax-m3`, `minimax-m2.7`, `minimax-m2.5` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI (m2.7/m3 使用 Anthropic) |
-| Qwen | `qwen3.7-max` | ❌ | `禁用思考` / `自动` / `思考` | Anthropic |
-| Qwen | `qwen3.6-plus`, `qwen3.5-plus` | ✅ | `禁用思考` / `自动` / `思考` | Anthropic |
+| MiMo | `mimo-v2-pro`, `mimo-v2-omni`, `mimo-v2.5-pro`, `mimo-v2.5` | mimo-v2-omni ✅ | `禁用思考` / `自动` | OpenAI |
+| MiniMax | `minimax-m3`, `minimax-m2.7`, `minimax-m2.5` | ❌ | `禁用思考` / `自动` | OpenAI (m2.7 使用 Anthropic) |
+| Qwen | `qwen3.7-max` | ❌ | `禁用思考` / `自动` | Anthropic |
+| Qwen | `qwen3.6-plus`, `qwen3.5-plus` | ✅ | `禁用思考` / `自动` | Anthropic |
 
 #### OpenCode Zen 免费模型（可选）
 
@@ -71,14 +71,17 @@
 |--------|---------|------|----------------|----------|------|
 | Zen/Big Pickle Free | `big-pickle` | ❌ | `思考`（不支持思考切换） | OpenAI | 限时免费 |
 | Zen/DeepSeek V4 Flash Free | `deepseek-v4-flash-free` | ❌ | `禁用思考` / `自动` / `高` / `极高` | OpenAI | 限时免费 |
-| Zen/MiniMax M2.5 Free | `minimax-m2.5-free` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI | 限时免费 |
-| Zen/Ring 2.6 1T Free | `ring-2.6-1t-free` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI | 限时免费 |
-| Zen/Nemotron 3 Super Free | `nemotron-3-super-free` | ❌ | `禁用思考` / `自动` / `思考` | OpenAI | 限时免费 |
+| Zen/MiniMax M2.5 Free | `minimax-m2.5-free` | ❌ | `禁用思考` / `自动` | OpenAI | 限时免费 |
+| Zen/Ring 2.6 1T Free | `ring-2.6-1t-free` | ❌ | `禁用思考` / `自动` | OpenAI | 限时免费 |
+| Zen/Nemotron 3 Super Free | `nemotron-3-super-free` | ❌ | `禁用思考` / `自动` | OpenAI | 限时免费 |
 
 在模型选择器中，内置模型归入 `OpenCode Go` 分组（`family="OpenCodeGo"`），Zen 免费模型归入 `OpenCode Zen` 分组（`family="OpenCode Zen"`）以作区分。
 
 > 所有模型在模型选择器中均显示**一个条目**，通过**推理强度选择器**（中文标签）切换思考模式。  
-> - `thinkingMode="switchable"`：用户可选择`禁用思考`、`自动`或启用思考（强度可配置）  
+> 所有模型在模型选择器中均显示**一个条目**，通过**推理强度选择器**（中文标签）切换思考模式。  
+> - `thinkingMode="switchable"`：用户可选择`禁用思考`或`自动`（或特定强度档位），由模型自动决定是否启用思考  
+> - `thinkingMode="adaptive"`：仅`禁用思考`和`自动`两档选择，无强制启用思考选项  
+> - `thinkingMode="always"`：推理始终启用，选择器中不显示`禁用思考`选项（模型特性）  
 > - `thinkingMode="always"`：推理始终启用，选择器中不显示`禁用思考`选项（模型特性）  
 > 
 > **关于图像输入：** 所有模型（包括非视觉模型）的 `imageInput` 能力均声明为 `true`，以确保 VS Code 始终传递图片数据。非视觉模型通过内部的 `describe_image` 工具代理机制处理图片，不直接支持视觉输入。
@@ -480,7 +483,7 @@ src/
 | `baseId` | `string` | API 请求中使用的模型 ID |
 | `displayName` | `string` | 用户友好的显示名称 |
 | `vision` | `boolean` | 是否支持图片输入（所有模型 `imageInput` 能力声明为 `true`，非视觉模型通过代理处理） |
-| `thinkingMode` | `"switchable" \| "always"` | switchable=可选择思考开关, always=思考始终启用 |
+| `thinkingMode` | `"switchable" \| "always" \| "adaptive"` | switchable=可选择思考开关, always=思考始终启用, adaptive=仅禁用/自动 |
 | `defaultReasoningEffort` | `string` (可选) | 默认推理力度 |
 | `supportedReasoningEfforts` | `string[]` (可选) | 支持的推理力度选项 |
 | `includeReasoningInRequest` | `boolean` (可选) | 是否在 assistant 消息中包含 reasoning_content |
@@ -493,7 +496,7 @@ src/
 16 个内置模型定义常量数组。
 
 #### `getBuiltInModelInfos(): LanguageModelChatInformation[]`
-将内置模型定义转换为 VS Code 的模型信息列表。每个模型注册**一个条目**，带 `isUserSelectable: true` 确保在模型选择器中可见（VS Code 1.120+ 要求），并通过 `configurationSchema` 附加推理强度选择器（中文标签）。switchable 模型显示 `禁用思考/自动/思考` 或 `禁用思考/自动/高/最大`（可关闭推理）；always 模型不显示 `禁用思考` 选项，仅在支持推理强度时显示强度选项。
+将内置模型定义转换为 VS Code 的模型信息列表。每个模型注册**一个条目**，带 `isUserSelectable: true` 确保在模型选择器中可见（VS Code 1.120+ 要求），并通过 `configurationSchema` 附加推理强度选择器（中文标签）。switchable 模型显示 `禁用思考/自动` 或 `禁用思考/自动/高/最大`（可关闭推理）；adaptive 模型仅显示 `禁用思考/自动`；always 模型不显示 `禁用思考` 选项，仅在支持推理强度时显示强度选项。
 
 #### `getBuiltInModelCount(): number`
 返回内置模型定义总数（BUILT_IN_MODELS.length）。
