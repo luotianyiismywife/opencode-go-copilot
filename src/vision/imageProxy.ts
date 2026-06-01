@@ -30,11 +30,11 @@ export async function callVisionModel(
         [dataPart, textPart]
     );
 
-    const options: vscode.LanguageModelChatRequestOptions & { reasoningEffort?: string } = {};
+    const options: vscode.LanguageModelChatRequestOptions = {};
     // Enable thinking for better image analysis when the model supports it
     const visionThinking = vscode.workspace.getConfiguration().get<boolean>("opencodego.visionProxyThinking", true);
     if (visionThinking) {
-        options.reasoningEffort = "high";
+        options.modelOptions = { reasoning_effort: "high" };
     }
     const response = await visionModel.sendRequest([msg], options, token);
     let description = "";

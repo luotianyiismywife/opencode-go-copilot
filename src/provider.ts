@@ -340,6 +340,8 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                 await anthropicApi.processStreamingResponse(response.body, trackingProgress, token);
 
                 // --- Second round: handle ask_image tool call interception ---
+                // Clear the first-round timeout before starting the second round
+                clearTimeout(timeoutId);
                 await this._handleInterceptedToolCall({
                     api: anthropicApi,
                     apiMode: "anthropic",
@@ -412,6 +414,8 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                 await openaiApi.processStreamingResponse(response.body, trackingProgress, token);
 
                 // --- Second round: handle ask_image tool call interception ---
+                // Clear the first-round timeout before starting the second round
+                clearTimeout(timeoutId);
                 await this._handleInterceptedToolCall({
                     api: openaiApi,
                     apiMode: "openai",
@@ -448,12 +452,22 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
         } catch (err) {
             // Determine if the request was aborted/terminated (friendly message instead of raw error)
             const errMessage = err instanceof Error ? err.message : String(err);
-            const isTimeout = abortController.signal.aborted;
+            // Distinguish user cancellation from timeout: the AbortController is aborted
+            // by BOTH the timeout timer AND the user cancellation listener; check the
+            // VS Code cancellation token to tell them apart.
+            const isUserCancelled = token.isCancellationRequested;
+            const isTimeout = abortController.signal.aborted && !isUserCancelled;
             const isForceTerminated =
                 !isTimeout &&
+                !isUserCancelled &&
                 (errMessage.includes("terminated") ||
                  errMessage.includes("aborted") ||
                  (err instanceof Error && err.name === "AbortError"));
+
+            // If user cancelled, just re-throw the original error without wrapping
+            if (isUserCancelled) {
+                throw err;
+            }
 
             if (isTimeout || isForceTerminated) {
                 logger.error("request.timeout", {
@@ -584,6 +598,30 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
             new vscode.LanguageModelThinkingPart("", visionThinkId) as unknown as LanguageModelResponsePart
         );
 
+        // If user cancelled during the vision model call, skip second round
+        if (params.token.isCancellationRequested) {
+            logger.info("vision.skipped-second-round", { reason: "user_cancelled" });
+            return;
+        }
+
+        // Create a fresh abort controller for the second round to avoid
+        // interference from the first round's timeout timer
+        const secondAbortController = new AbortController();
+        const secondTimeoutMs = vscode.workspace.getConfiguration().get<number>("opencodego.requestTimeout", 600000);
+        const secondTimeoutId = setTimeout(() => {
+            if (!secondAbortController.signal.aborted) {
+                secondAbortController.abort();
+            }
+        }, secondTimeoutMs);
+        // Forward user cancellation to the new controller
+        if (params.token.onCancellationRequested) {
+            params.token.onCancellationRequested(() => {
+                if (!secondAbortController.signal.aborted) {
+                    secondAbortController.abort();
+                }
+            });
+        }
+
         // Build second-round messages and make another API request
         const api = params.api;
         // Get the original API messages (specific to each format)
@@ -628,6 +666,19 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
             if (params.um?.temperature !== undefined && params.um.temperature !== null) {
                 secondBody.temperature = params.um.temperature;
             }
+            // Restore system content for second round (extracted by convertMessages)
+            const anthropicSystemContent = (params.api as any)._systemContent as string | undefined;
+            if (anthropicSystemContent) {
+                secondBody.system = anthropicSystemContent;
+            }
+            // Preserve thinking mode for second round (Anthropic-compatible)
+            if (params.um?.enable_thinking === true) {
+                if (params.um?.reasoning_effort === 'adaptive') {
+                    secondBody.thinking = { type: "adaptive" };
+                } else {
+                    secondBody.thinking = { type: "enabled", budget_tokens: 8192 };
+                }
+            }
 
             const secondUrl = params.baseUrl.replace(/\/+$/, "");
             const url = secondUrl.endsWith("/v1")
@@ -639,7 +690,7 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                     method: "POST",
                     headers: params.requestHeaders,
                     body: JSON.stringify(secondBody),
-                    signal: params.abortController.signal,
+                    signal: secondAbortController.signal,
                 });
                 if (!res.ok) {
                     const errorText = await res.text();
@@ -651,6 +702,7 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
             if (secondResponse.body) {
                 await api.processStreamingResponse(secondResponse.body, params.trackingProgress, params.token);
             }
+            clearTimeout(secondTimeoutId);
         } else {
             // OpenAI format second round
             const secondMessages = [
@@ -711,7 +763,7 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                     method: "POST",
                     headers: params.requestHeaders,
                     body: JSON.stringify(secondBody),
-                    signal: params.abortController.signal,
+                    signal: secondAbortController.signal,
                 });
                 if (!res.ok) {
                     const errorText = await res.text();
@@ -723,6 +775,7 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
             if (secondResponse.body) {
                 await api.processStreamingResponse(secondResponse.body, params.trackingProgress, params.token);
             }
+            clearTimeout(secondTimeoutId);
         }
     }
 

@@ -62,6 +62,22 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 							mimeType: part.mimeType,
 						});
 					}
+					// Also scan inside tool result content for images
+					// (e.g., when view_image tool returns an image in a previous turn)
+					if (isToolResultPart(part)) {
+						const toolContent = (part as { content?: ReadonlyArray<unknown> }).content;
+						if (toolContent) {
+							for (const inner of toolContent) {
+								if (inner instanceof vscode.LanguageModelDataPart && isImageMimeType(inner.mimeType)) {
+									if (!imagesToStore) imagesToStore = [];
+									imagesToStore.push({
+										data: inner.data,
+										mimeType: inner.mimeType,
+									});
+								}
+							}
+						}
+					}
 				}
 			}
 			if (imagesToStore && imagesToStore.length > 0) {
@@ -95,7 +111,19 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 					});
 				} else if (isToolResultPart(part)) {
 					const callId = (part as { callId?: string }).callId ?? "";
-					const content = collectToolResultText(part as { content?: ReadonlyArray<unknown> });
+					const toolContent = (part as { content?: ReadonlyArray<unknown> }).content;
+					const toolTexts: string[] = [];
+					if (toolContent) {
+						for (const inner of toolContent) {
+							if (inner instanceof vscode.LanguageModelTextPart) {
+								toolTexts.push(inner.value);
+							} else if (!modelSupportsVision && inner instanceof vscode.LanguageModelDataPart && isImageMimeType(inner.mimeType)) {
+								toolTexts.push(`[Image data from previous tool call (imageIndex=${imageIndex})]`);
+								imageIndex++;
+							}
+						}
+					}
+					const content = toolTexts.join("\n").trim();
 					toolResults.push({
 						type: "tool_result",
 						tool_use_id: callId,
@@ -306,10 +334,11 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 		const reader = responseBody.getReader();
 		const decoder = new TextDecoder();
 		let buffer = "";
+		let cancelDisposable: vscode.Disposable | undefined;
 
 		// Immediately cancel the stream when user cancels, so reader.read() won't stay pending
 		if (token.onCancellationRequested) {
-			token.onCancellationRequested(() => {
+			cancelDisposable = token.onCancellationRequested(() => {
 				reader.cancel().catch(() => {});
 			});
 		}
@@ -363,6 +392,7 @@ export class AnthropicApi extends CommonApi<AnthropicMessage, AnthropicRequestBo
 			logger.error("anthropic.stream.error", { modelId, error: e instanceof Error ? e.message : String(e) });
 			throw e;
 		} finally {
+			cancelDisposable?.dispose();
 			reader.releaseLock();
 			this.reportEndThinking(progress);
 		}
