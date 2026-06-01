@@ -482,16 +482,16 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                 throw new Error(l10n("Request timed out. The generation took too long. You can increase the timeout in settings (opencodego.requestTimeout)."));
             }
 
-            // Check for Zen free model expiration error
-            if (errMessage.includes("no longer available as a free model") || errMessage.includes("has transitioned to a paid model")) {
-                const caughtModelConfig = getBuiltInModelConfig(model.id) ?? getZenFreeModelConfig(model.id);
-                const caughtModelName = caughtModelConfig?.displayName ?? model.id;
+            // Detect Zen free model expiration: a 401 from a Zen free model
+            // means the free promotion has ended (error text may vary - don't match on it)
+            if (errMessage.includes("[401]") && getZenFreeModelConfig(model.id)) {
+                const zenModelName = getZenFreeModelConfig(model.id)?.displayName ?? model.id;
                 logger.error("request.error", {
                     modelId: model.id,
                     error: "zen_free_model_expired",
                     errorMessage: errMessage,
                 });
-                throw new Error(l10nFormat("{0} is no longer available as a free model. Please use a different model.", caughtModelName));
+                throw new Error(l10nFormat("{0} is no longer available as a free model. Please use a different model.", zenModelName));
             }
 
             console.error("[OpenCodeGo] Chat request failed", {
