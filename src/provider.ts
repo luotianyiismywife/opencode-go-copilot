@@ -14,7 +14,7 @@ import * as path from "path";
 
 import type { ModelPreset, OpenCodeGoModelItem } from "./types";
 
-import { createRetryConfig, executeWithRetry } from "./utils";
+import { createRetryConfig, executeWithRetry, convertToolsToOpenAI } from "./utils";
 
 import { prepareLanguageModelChatInformation } from "./provideModel";
 import { getBuiltInModelConfig } from "./models";
@@ -27,7 +27,7 @@ import { AnthropicApi } from "./anthropic/anthropicApi";
 import type { AnthropicRequestBody } from "./anthropic/anthropicTypes";
 import { CommonApi, type StreamUsage } from "./commonApi";
 import { callVisionModel } from "./vision/imageProxy";
-import { ASK_IMAGE_TOOL_NAME } from "./vision/types";
+import { ASK_IMAGE_TOOL_NAME, ASK_IMAGE_TOOL_DEF } from "./vision/types";
 import type { InterceptedToolCall, StoredImage } from "./vision/types";
 import { logger } from "./logger";
 import { l10n } from "./localize";
@@ -359,10 +359,8 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                     abortController: abortController,
                     trackingProgress: trackingProgress,
                     token: token,
+                    options: options,
                 });
-
-                // Clean up stored images
-                anthropicApi.cleanupStoredImages();
             } else {
                 // OpenAI Chat Completions API mode
                 const openaiApi = new OpenaiApi(model.id);
@@ -437,10 +435,8 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                     abortController: abortController,
                     trackingProgress: trackingProgress,
                     token: token,
+                    options: options,
                 });
-
-                // Clean up stored images
-                openaiApi.cleanupStoredImages();
             }
 
             // Fallback: if API did not return usage data, use client-side calculation for native indicator
@@ -551,247 +547,275 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
         abortController: AbortController;
         trackingProgress: Progress<LanguageModelResponsePart>;
         token: CancellationToken;
+        options: ProvideLanguageModelChatResponseOptions;
     }): Promise<void> {
-        const intercepted = params.api.interceptedToolCall;
-        if (!intercepted) {
-            logger.debug("vision.no-intercepted-call", {
-                hasStoredImages: !!(params.api as any)._imageStoreKey,
-                originalMessagesLen: ((params.api as any)._originalApiMessages as any[])?.length ?? 0,
-            });
-            return;
-        }
-
-        logger.info("vision.intercepted", {
-            toolName: intercepted.name,
-            imageIndex: intercepted.args.imageIndex,
-            query: intercepted.args.query,
-            apiMode: params.apiMode,
-        });
-
-        const config = vscode.workspace.getConfiguration();
-        const visionModelId = config.get<string>("opencodego.visionProxyModel", "qwen3.6-plus");
-        // Use the model's specific query as the prompt to the vision model
-        // This is the key difference from the old describe_image approach:
-        // the model can ask targeted questions ("What color is the button?", "Read the text")
-        // instead of always getting a generic description.
-        const visionPrompt = intercepted.args.query;
-
-        // Get the stored image data
-        const storedImage = params.api.getStoredImage(intercepted.args.imageIndex);
-        if (!storedImage) {
-            logger.warn("vision.image-not-found", { imageIndex: intercepted.args.imageIndex });
-            return;
-        }
-
-        // Emit a brief thinking indicator BEFORE reading the image
-        const visionThinkId = `vision_${Date.now()}`;
-        params.trackingProgress.report(
-            new vscode.LanguageModelThinkingPart(l10n("Reading image..."), visionThinkId) as unknown as LanguageModelResponsePart
-        );
-
-        // Call vision model to answer the model's specific query about the image
-        let description: string;
-        try {
-            description = await callVisionModel(
-                storedImage.data,
-                storedImage.mimeType,
-                visionModelId,
-                visionPrompt,
-                params.token
-            );
-        } catch (err) {
-            const errMsg = err instanceof Error ? err.message : String(err);
-            logger.error("vision.call-failed", { error: errMsg, visionModelId });
-            description = "[Image query unavailable]";
-        }
-
-        // Append "done" to the thinking block, then close it.
-        // The description is only for the model (second round via tool_result).
-        params.trackingProgress.report(
-            new vscode.LanguageModelThinkingPart(l10n(" done"), visionThinkId) as unknown as LanguageModelResponsePart
-        );
-        params.trackingProgress.report(
-            new vscode.LanguageModelThinkingPart("", visionThinkId) as unknown as LanguageModelResponsePart
-        );
-
-        // If user cancelled during the vision model call, skip second round
-        if (params.token.isCancellationRequested) {
-            logger.info("vision.skipped-second-round", { reason: "user_cancelled" });
-            return;
-        }
-
-        // Create a fresh abort controller for the second round to avoid
-        // interference from the first round's timeout timer
-        const secondAbortController = new AbortController();
-        const secondTimeoutMs = vscode.workspace.getConfiguration().get<number>("opencodego.requestTimeout", 600000);
-        const secondTimeoutId = setTimeout(() => {
-            if (!secondAbortController.signal.aborted) {
-                secondAbortController.abort();
-            }
-        }, secondTimeoutMs);
-        // Forward user cancellation to the new controller
-        if (params.token.onCancellationRequested) {
-            params.token.onCancellationRequested(() => {
-                if (!secondAbortController.signal.aborted) {
-                    secondAbortController.abort();
-                }
-            });
-        }
-
-        // Build second-round messages and make another API request
         const api = params.api;
-        // Get the original API messages (specific to each format)
         const storedMessages = (api as any)._originalApiMessages as any[] | undefined;
+        const imgKey = (api as any)._imageStoreKey as string | null;
+
+        // Nothing to proxy — no stored images
+        if (!imgKey || !CommonApi.storedImages.has(imgKey)) {
+            logger.debug("vision.no-stored-images", { hasStoredMessages: !!storedMessages });
+            return;
+        }
         if (!storedMessages || storedMessages.length === 0) {
             logger.warn("vision.no-second-round-messages", {});
             return;
         }
 
-        const toolCallId = intercepted.id;
-        const toolArgs = intercepted.args;
+        const config = vscode.workspace.getConfiguration();
+        const visionModelId = config.get<string>("opencodego.visionProxyModel", "qwen3.6-plus");
+        const maxRounds = config.get<number>("opencodego.visionMaxRounds", 5);
 
-        if (params.apiMode === "anthropic") {
-            // Anthropic format second round
-            const secondMessages = [
-                ...storedMessages,
-                {
-                    role: "assistant" as const,
-                    content: [
-                        { type: "tool_use" as const, id: toolCallId, name: ASK_IMAGE_TOOL_NAME, input: toolArgs },
-                    ],
-                },
-                {
-                    role: "user" as const,
-                    content: [
-                        { type: "tool_result" as const, tool_use_id: toolCallId, content: description },
-                    ],
-                },
-            ];
+        // Accumulate messages across rounds
+        let currentMessages: any[] = [...storedMessages];
 
-            let secondBody: Record<string, unknown> = {
-                model: params.um?.id ?? params.model.id,
-                messages: secondMessages,
-                stream: true,
-            };
-            // Apply common Anthropic-like params without injecting tools
-            if (params.um?.max_completion_tokens !== undefined) {
-                secondBody.max_tokens = params.um.max_completion_tokens;
-            } else if (params.um?.max_tokens !== undefined) {
-                secondBody.max_tokens = params.um.max_tokens;
+        for (let round = 1; round <= maxRounds; round++) {
+            const intercepted = api.interceptedToolCall;
+            if (!intercepted) {
+                break;
             }
-            if (params.um?.temperature !== undefined && params.um.temperature !== null) {
-                secondBody.temperature = params.um.temperature;
+            // Clear so processStreamingResponse in the next round can set a new one
+            api.interceptedToolCall = null;
+
+            logger.info("vision.intercepted", {
+                round,
+                toolName: intercepted.name,
+                imageIndex: intercepted.args.imageIndex,
+                query: intercepted.args.query,
+                apiMode: params.apiMode,
+            });
+
+            const visionPrompt = intercepted.args.query;
+
+            // Get the stored image data
+            const storedImage = api.getStoredImage(intercepted.args.imageIndex);
+            if (!storedImage) {
+                logger.warn("vision.image-not-found", { imageIndex: intercepted.args.imageIndex });
+                break;
             }
-            // Restore system content for second round (extracted by convertMessages)
-            const anthropicSystemContent = (params.api as any)._systemContent as string | undefined;
-            if (anthropicSystemContent) {
-                secondBody.system = anthropicSystemContent;
+
+            // Emit a brief thinking indicator BEFORE reading the image
+            const visionThinkId = `vision_${Date.now()}_${round}`;
+            params.trackingProgress.report(
+                new vscode.LanguageModelThinkingPart(l10n("Reading image..."), visionThinkId) as unknown as LanguageModelResponsePart
+            );
+
+            // Call vision model to answer the model's specific query about the image
+            let description: string;
+            try {
+                description = await callVisionModel(
+                    storedImage.data,
+                    storedImage.mimeType,
+                    visionModelId,
+                    visionPrompt,
+                    params.token
+                );
+            } catch (err) {
+                const errMsg = err instanceof Error ? err.message : String(err);
+                logger.error("vision.call-failed", { error: errMsg, visionModelId });
+                description = "[Image query unavailable]";
             }
-            // Preserve thinking mode for second round (Anthropic-compatible)
-            if (params.um?.enable_thinking === true) {
-                if (params.um?.reasoning_effort === 'adaptive') {
-                    secondBody.thinking = { type: "adaptive" };
+
+            // Close thinking indicator
+            params.trackingProgress.report(
+                new vscode.LanguageModelThinkingPart(l10n(" done"), visionThinkId) as unknown as LanguageModelResponsePart
+            );
+            params.trackingProgress.report(
+                new vscode.LanguageModelThinkingPart("", visionThinkId) as unknown as LanguageModelResponsePart
+            );
+
+            // If user cancelled during the vision model call, stop
+            if (params.token.isCancellationRequested) {
+                logger.info("vision.skipped-round", { round, reason: "user_cancelled" });
+                break;
+            }
+
+            // Create a fresh abort controller for this round
+            const roundAbortController = new AbortController();
+            const roundTimeoutMs = vscode.workspace.getConfiguration().get<number>("opencodego.requestTimeout", 600000);
+            const roundTimeoutId = setTimeout(() => {
+                if (!roundAbortController.signal.aborted) {
+                    roundAbortController.abort();
+                }
+            }, roundTimeoutMs);
+            // Forward user cancellation
+            if (params.token.onCancellationRequested) {
+                params.token.onCancellationRequested(() => {
+                    if (!roundAbortController.signal.aborted) {
+                        roundAbortController.abort();
+                    }
+                });
+            }
+
+            try {
+                if (params.apiMode === "anthropic") {
+                    // Anthropic format: append tool_use + tool_result to accumulated messages
+                    currentMessages.push({
+                        role: "assistant" as const,
+                        content: [
+                            { type: "tool_use" as const, id: intercepted.id, name: ASK_IMAGE_TOOL_NAME, input: intercepted.args },
+                        ],
+                    });
+                    currentMessages.push({
+                        role: "user" as const,
+                        content: [
+                            { type: "tool_result" as const, tool_use_id: intercepted.id, content: description },
+                        ],
+                    });
+
+                    const body: Record<string, unknown> = {
+                        model: params.um?.id ?? params.model.id,
+                        messages: currentMessages,
+                        stream: true,
+                    };
+                    if (params.um?.max_completion_tokens !== undefined) {
+                        body.max_tokens = params.um.max_completion_tokens;
+                    } else if (params.um?.max_tokens !== undefined) {
+                        body.max_tokens = params.um.max_tokens;
+                    }
+                    if (params.um?.temperature !== undefined && params.um.temperature !== null) {
+                        body.temperature = params.um.temperature;
+                    }
+                    const systemContent = (params.api as any)._systemContent as string | undefined;
+                    if (systemContent) {
+                        body.system = systemContent;
+                    }
+                    if (params.um?.enable_thinking === true) {
+                        if (params.um?.reasoning_effort === 'adaptive') {
+                            body.thinking = { type: "adaptive" };
+                        } else {
+                            body.thinking = { type: "enabled", budget_tokens: 8192 };
+                        }
+                    }
+
+                    // Inject tools (VS Code tools + ask_image)
+                    const anthropicToolList: Array<{ name: string; description?: string; input_schema?: object }> = [];
+                    const toolConfig = convertToolsToOpenAI(params.options);
+                    if (toolConfig.tools) {
+                        for (const tool of toolConfig.tools) {
+                            anthropicToolList.push({
+                                name: tool.function.name,
+                                description: tool.function.description,
+                                input_schema: tool.function.parameters,
+                            });
+                        }
+                    }
+                    if (imgKey && CommonApi.storedImages.has(imgKey)) {
+                        const def = ASK_IMAGE_TOOL_DEF as unknown as { function: { name: string; description: string; parameters: object } };
+                        anthropicToolList.push({
+                            name: def.function.name,
+                            description: def.function.description,
+                            input_schema: def.function.parameters,
+                        });
+                    }
+                    if (anthropicToolList.length > 0) {
+                        body.tools = anthropicToolList;
+                    }
+
+                    const normalizedUrl = params.baseUrl.replace(/\/+$/, "");
+                    const url = normalizedUrl.endsWith("/v1")
+                        ? `${normalizedUrl}/messages`
+                        : `${normalizedUrl}/v1/messages`;
+
+                    const response = await executeWithRetry(async () => {
+                        const res = await params.dispatchFetch(url, {
+                            method: "POST",
+                            headers: params.requestHeaders,
+                            body: JSON.stringify(body),
+                            signal: roundAbortController.signal,
+                        });
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            throw new Error(`Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`);
+                        }
+                        return res;
+                    }, params.retryConfig);
+
+                    if (response.body) {
+                        await api.processStreamingResponse(response.body, params.trackingProgress, params.token);
+                    }
                 } else {
-                    secondBody.thinking = { type: "enabled", budget_tokens: 8192 };
-                }
-            }
-
-            const secondUrl = params.baseUrl.replace(/\/+$/, "");
-            const url = secondUrl.endsWith("/v1")
-                ? `${secondUrl}/messages`
-                : `${secondUrl}/v1/messages`;
-
-            const secondResponse = await executeWithRetry(async () => {
-                const res = await params.dispatchFetch(url, {
-                    method: "POST",
-                    headers: params.requestHeaders,
-                    body: JSON.stringify(secondBody),
-                    signal: secondAbortController.signal,
-                });
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    throw new Error(`Anthropic API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`);
-                }
-                return res;
-            }, params.retryConfig);
-
-            if (secondResponse.body) {
-                await api.processStreamingResponse(secondResponse.body, params.trackingProgress, params.token);
-            }
-            clearTimeout(secondTimeoutId);
-        } else {
-            // OpenAI format second round
-            const secondMessages = [
-                ...storedMessages,
-                {
-                    role: "assistant" as const,
-                    // DeepSeek requires reasoning_content when thinking mode is enabled,
-                    // even on tool call assistant messages.
-                    // Note: content must be omitted, not null — DeepSeek rejects null content.
-                    reasoning_content: "Calling ask_image tool to get information about the user's attached image.",
-                    tool_calls: [
-                        {
-                            id: toolCallId,
-                            type: "function" as const,
-                            function: {
-                                name: ASK_IMAGE_TOOL_NAME,
-                                arguments: JSON.stringify(toolArgs),
+                    // OpenAI format: append assistant tool_call + tool result
+                    currentMessages.push({
+                        role: "assistant" as const,
+                        reasoning_content: `Calling ask_image tool (round ${round}) to get information about the user's attached image.`,
+                        tool_calls: [
+                            {
+                                id: intercepted.id,
+                                type: "function" as const,
+                                function: {
+                                    name: ASK_IMAGE_TOOL_NAME,
+                                    arguments: JSON.stringify(intercepted.args),
+                                },
                             },
-                        },
-                    ],
-                },
-                {
-                    role: "tool" as const,
-                    tool_call_id: toolCallId,
-                    content: description,
-                },
-            ];
+                        ],
+                    });
+                    currentMessages.push({
+                        role: "tool" as const,
+                        tool_call_id: intercepted.id,
+                        content: description,
+                    });
 
-            let secondBody: Record<string, unknown> = {
-                model: params.um?.id ?? params.model.id,
-                messages: secondMessages,
-                stream: true,
-                stream_options: { include_usage: true },
-            };
-            // Apply temperature and other params without injecting tools
-            if (params.um?.temperature !== undefined && params.um.temperature !== null) {
-                secondBody.temperature = params.um.temperature;
-            }
-            if (params.um?.top_p !== undefined && params.um.top_p !== null) {
-                secondBody.top_p = params.um.top_p;
-            }
-            if (params.um?.max_completion_tokens !== undefined) {
-                secondBody.max_completion_tokens = params.um.max_completion_tokens;
-            }
-            // Preserve thinking mode for second round (required by DeepSeek)
-            if (params.um?.enable_thinking !== false && params.um?.reasoning_effort !== undefined) {
-                secondBody.reasoning_effort = params.um.reasoning_effort;
-            }
-            if (params.um?.enable_thinking === true) {
-                secondBody.thinking = { type: "enabled" };
-            } else {
-                secondBody.thinking = { type: "disabled" };
-            }
+                    const body: Record<string, unknown> = {
+                        model: params.um?.id ?? params.model.id,
+                        messages: currentMessages,
+                        stream: true,
+                        stream_options: { include_usage: true },
+                    };
+                    if (params.um?.temperature !== undefined && params.um.temperature !== null) {
+                        body.temperature = params.um.temperature;
+                    }
+                    if (params.um?.top_p !== undefined && params.um.top_p !== null) {
+                        body.top_p = params.um.top_p;
+                    }
+                    if (params.um?.max_completion_tokens !== undefined) {
+                        body.max_completion_tokens = params.um.max_completion_tokens;
+                    }
+                    if (params.um?.enable_thinking !== false && params.um?.reasoning_effort !== undefined) {
+                        body.reasoning_effort = params.um.reasoning_effort;
+                    }
+                    if (params.um?.enable_thinking === true) {
+                        body.thinking = { type: "enabled" };
+                    } else {
+                        body.thinking = { type: "disabled" };
+                    }
 
-            const url = `${params.baseUrl.replace(/\/+$/, "")}/chat/completions`;
-            const secondResponse = await executeWithRetry(async () => {
-                const res = await params.dispatchFetch(url, {
-                    method: "POST",
-                    headers: params.requestHeaders,
-                    body: JSON.stringify(secondBody),
-                    signal: secondAbortController.signal,
-                });
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    throw new Error(`API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`);
+                    // Inject tools (VS Code tools + ask_image)
+                    const openaiToolList: any[] = [];
+                    const toolConfig = convertToolsToOpenAI(params.options);
+                    if (toolConfig.tools) {
+                        openaiToolList.push(...toolConfig.tools);
+                    }
+                    if (imgKey && CommonApi.storedImages.has(imgKey)) {
+                        openaiToolList.push(ASK_IMAGE_TOOL_DEF);
+                    }
+                    if (openaiToolList.length > 0) {
+                        body.tools = openaiToolList;
+                    }
+
+                    const url = `${params.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+                    const response = await executeWithRetry(async () => {
+                        const res = await params.dispatchFetch(url, {
+                            method: "POST",
+                            headers: params.requestHeaders,
+                            body: JSON.stringify(body),
+                            signal: roundAbortController.signal,
+                        });
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            throw new Error(`API error: [${res.status}] ${res.statusText}${errorText ? `\n${errorText}` : ""}`);
+                        }
+                        return res;
+                    }, params.retryConfig);
+
+                    if (response.body) {
+                        await api.processStreamingResponse(response.body, params.trackingProgress, params.token);
+                    }
                 }
-                return res;
-            }, params.retryConfig);
-
-            if (secondResponse.body) {
-                await api.processStreamingResponse(secondResponse.body, params.trackingProgress, params.token);
+            } finally {
+                clearTimeout(roundTimeoutId);
             }
-            clearTimeout(secondTimeoutId);
         }
     }
 
