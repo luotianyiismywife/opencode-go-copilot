@@ -60,9 +60,6 @@ This extension adds **extended vision understanding** capability to **text-only 
 
 You can configure the default vision model and whether to enable thinking when describing images. By default, Qwen3.6-Plus is used to describe images.
 
-> [!NOTE]
-> This is an experimental feature and may not work reliably.
-
 ### OpenCode Zen Free Models
 
 Disabled by default. Enable via the `opencodego.enableZenFreeModels` setting. When enabled, free models fetched from the Zen API are added to the model picker with a `Zen/` prefix (e.g. `Zen/DeepSeek V4 Flash Free`). Requires a full reload of VS Code to take effect after changing the setting.
@@ -150,9 +147,6 @@ MIT License. This project references code from [oai-compatible-copilot](https://
 本插件为**不支持视觉理解**的**纯文本模型**添加了**扩展视觉理解**功能，当你向这些模型发送带有图片的信息时，他们可以调用支持视觉理解的模型为图片输出描述，然后再回答。
 
 通过配置文件可更改默认使用的模型以及是否在描述图片时启用思考。默认情况下，将使用 Qwen3.6-Plus 描述图片。
-
-> [!NOTE]
-> 此功能为实验性功能，不保证好用。
 
 ### 启用 OpenCode Zen 免费模型
 
