@@ -614,13 +614,30 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                     questionThinkId
                 ) as unknown as LanguageModelResponsePart
             );
-            // Close block 1 — the vision model's output comes next as regular text
+            // Close block 1
             params.trackingProgress.report(
                 new vscode.LanguageModelThinkingPart("", questionThinkId) as unknown as LanguageModelResponsePart
             );
 
+            // Block 2: vision model's thinking/reasoning (real-time streaming)
+            const thinkBlockId = `vision_think_${Date.now()}_${round}`;
+            // Block 3: vision model's final output (real-time streaming)
+            const textBlockId = `vision_text_${Date.now()}_${round}`;
+
+            const visionProgress = {
+                onThinking: (text: string) => {
+                    params.trackingProgress.report(
+                        new vscode.LanguageModelThinkingPart(text, thinkBlockId) as unknown as LanguageModelResponsePart
+                    );
+                },
+                onText: (text: string) => {
+                    params.trackingProgress.report(
+                        new vscode.LanguageModelThinkingPart(text, textBlockId) as unknown as LanguageModelResponsePart
+                    );
+                },
+            };
+
             // Call vision model — single image or multi-image depending on tool used.
-            // The output streams directly as LanguageModelTextPart (block 3).
             let description: string;
             try {
                 if (intercepted.name === ASK_WITH_MULTI_IMAGE_TOOL_NAME) {
@@ -635,7 +652,7 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                         logger.warn("vision.not-enough-images", { indices });
                         description = "[Not enough images for comparison]";
                     } else {
-                        description = await callVisionModelMulti(images, visionModelId, visionPrompt, params.token, params.trackingProgress);
+                        description = await callVisionModelMulti(images, visionModelId, visionPrompt, params.token, visionProgress);
                     }
                 } else {
                     // Single image
@@ -650,7 +667,7 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                             visionModelId,
                             visionPrompt,
                             params.token,
-                            params.trackingProgress
+                            visionProgress
                         );
                     }
                 }
@@ -660,7 +677,14 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                 description = "[Image query unavailable]";
             }
 
-            // If user cancelled during the vision model call, stop
+            // Close block 2 (vision thinking)
+            params.trackingProgress.report(
+                new vscode.LanguageModelThinkingPart("", thinkBlockId) as unknown as LanguageModelResponsePart
+            );
+            // Close block 3 (vision output)
+            params.trackingProgress.report(
+                new vscode.LanguageModelThinkingPart("", textBlockId) as unknown as LanguageModelResponsePart
+            );
             if (params.token.isCancellationRequested) {
                 logger.info("vision.skipped-round", { round, reason: "user_cancelled" });
                 break;

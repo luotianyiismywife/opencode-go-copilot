@@ -21,12 +21,16 @@ function buildVisionOptions(): vscode.LanguageModelChatRequestOptions {
 
 /**
  * Send a message to a vision model, stream output via progress, and return the full text.
+ * progress.onThinking is called for thinking/reasoning chunks, progress.onText for text chunks.
  */
 async function sendToVisionModel(
     msg: vscode.LanguageModelChatMessage,
     visionModelId: string,
     token: vscode.CancellationToken,
-    progress?: { report: (part: vscode.LanguageModelResponsePart) => void }
+    progress?: {
+        onThinking?: (text: string) => void;
+        onText?: (text: string) => void;
+    }
 ): Promise<string> {
     const models = await vscode.lm.selectChatModels({ id: visionModelId });
     if (!models || models.length === 0) {
@@ -36,9 +40,14 @@ async function sendToVisionModel(
     const response = await visionModel.sendRequest([msg], buildVisionOptions(), token);
     let result = "";
     for await (const chunk of response.stream) {
-        if (chunk instanceof vscode.LanguageModelTextPart) {
+        if (chunk instanceof vscode.LanguageModelThinkingPart) {
+            const text = Array.isArray(chunk.value) ? chunk.value.join("") : chunk.value;
+            if (text) {
+                progress?.onThinking?.(text);
+            }
+        } else if (chunk instanceof vscode.LanguageModelTextPart) {
             result += chunk.value;
-            progress?.report(chunk);
+            progress?.onText?.(chunk.value);
         }
     }
     return result.trim();
@@ -56,7 +65,10 @@ export async function callVisionModel(
     visionModelId: string,
     query: string | undefined,
     token: vscode.CancellationToken,
-    progress?: { report: (part: vscode.LanguageModelResponsePart) => void }
+    progress?: {
+        onThinking?: (text: string) => void;
+        onText?: (text: string) => void;
+    }
 ): Promise<string> {
     const dataPart = new vscode.LanguageModelDataPart(imageData, mimeType);
     const prompt = query ?? DEFAULT_VISION_PROMPT;
@@ -81,7 +93,10 @@ export async function callVisionModelMulti(
     visionModelId: string,
     query: string | undefined,
     token: vscode.CancellationToken,
-    progress?: { report: (part: vscode.LanguageModelResponsePart) => void }
+    progress?: {
+        onThinking?: (text: string) => void;
+        onText?: (text: string) => void;
+    }
 ): Promise<string> {
     const prompt = query ?? "Compare and analyze these images. What do you see?";
     const parts: (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[] = [];
