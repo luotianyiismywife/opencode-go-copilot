@@ -60,19 +60,19 @@ export const ASK_WITH_MULTI_IMAGE_TOOL_DEF = {
     type: "function" as const,
     function: {
         name: "ask_with_multi_image",
-        description: "Like ask_image, but accepts MULTIPLE images at once. Use this when you need to compare, contrast, or analyze multiple images together (e.g. 'what's different between these two screenshots?', 'which layout is better?', 'do these images show the same error?').\n\nIf you only need to ask about ONE image, use ask_image instead — it's simpler.",
+        description: "Like ask_image, but accepts MULTIPLE images at once. Use this when you need to compare, contrast, or analyze multiple images together (e.g. 'what's different between these two screenshots?', 'which layout is better?', 'do these images show the same error?').\n\nIn your query, you can reference images by their attachment order (e.g., 'the first image shows A, the second image shows B — what's different?') for complex multi-step questions. The vision model sees all selected images simultaneously.\n\nIf you only need to ask about ONE image, use ask_image instead — it's simpler.",
         parameters: {
             type: "object",
             properties: {
                 imageIndices: {
                     type: "array",
                     items: { type: "integer" },
-                    description: "Array of 0-based image indices to analyze. At least 2 indices. Example: [0, 1] to compare the first and second image.",
+                    description: "Array of 0-based image indices (attachment order) to analyze. At least 2 indices. Example: [0, 1] to compare the first and second attached image.",
                     minItems: 2,
                 },
                 query: {
                     type: "string",
-                    description: "The question about the images. Since the vision model sees ALL selected images at once, ask about relationships, differences, or comparisons. Examples: 'What are the differences between these two screenshots?', 'Which UI design looks more modern?', 'Do both images show the same error code?'",
+                    description: "The question about the images. Since the vision model sees ALL selected images at once, ask about relationships, differences, or comparisons. Reference images by their attachment order for clarity, e.g.: 'The first image is a login page, the second image is a dashboard — is the color scheme consistent?' or 'Compare the error messages in the first and second image, are they the same error?'",
                 },
             },
             required: ["imageIndices", "query"],
