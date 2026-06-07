@@ -1122,6 +1122,9 @@ Zen API 基础 URL：`https://opencode.ai/zen/v1/`。
 npm run compile
 # 等效于: npx tsc -p ./
 
+# ESLint 检查
+npm run lint
+
 # 仅类型检查（无输出）
 npx tsc --noEmit
 
@@ -1149,9 +1152,12 @@ npm run build
 | 依赖 | 版本 | 用途 |
 |------|------|------|
 | `@microsoft/tiktokenizer` | ^1.0.10 | o200k_base 分词器 |
+| `@eslint/js` | 9.39.4 | ESLint JavaScript 推荐规则 |
 | `@types/node` | ^22 | Node.js 类型定义 |
-| `@types/vscode` | ^1.104.0 | VS Code 类型定义 |
+| `@types/vscode` | ^1.116.0 | VS Code 类型定义 |
+| `eslint` | 9.39.4 | 代码检查工具 |
 | `typescript` | ^5.9.2 | TypeScript 编译器 |
+| `typescript-eslint` | 8.60.1 | TypeScript ESLint 配置与解析器 |
 
 ---
 
