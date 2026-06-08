@@ -66,7 +66,7 @@ export interface AnthropicRequestBody {
 	};
 	service_tier?: "auto" | "standard_only";
 	thinking?: {
-		type: "enabled" | "adaptive";
+		type: "enabled" | "adaptive" | "disabled";
 		budget_tokens?: number;
 	};
 	tools?: AnthropicToolDefinition[];
