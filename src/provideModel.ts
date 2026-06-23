@@ -40,11 +40,28 @@ function buildAutoDiscoveredInfo(
     // Determine tool calling support
     const toolCalling = entry?.tool_call ?? true;
 
-    // Build reasoning effort enum for always mode with no efforts:
-    // just ["enabled"] → one option, thinking always on
-    const enumValues = ["enabled"];
-    const enumItemLabels = [l10n("Thinking")];
-    const enumDescriptions = [l10n("Enable thinking")];
+    // Determine thinking mode from models.dev reasoning field
+    // reasoning=true → model supports thinking → show toggle (switchable)
+    // reasoning=false/undefined → no thinking capability → always (no toggle)
+    const hasReasoning = entry?.reasoning === true;
+    let enumValues: string[];
+    let enumItemLabels: string[];
+    let enumDescriptions: string[];
+    let defaultEffort: string;
+
+    if (hasReasoning) {
+        // switchable: user can turn thinking on/off
+        enumValues = ["disabled", "enabled"];
+        enumItemLabels = [l10n("Disabled"), l10n("Thinking")];
+        enumDescriptions = [l10n("Do not enable thinking"), l10n("Enable thinking")];
+        defaultEffort = "enabled";
+    } else {
+        // always: thinking not supported, no toggle
+        enumValues = ["enabled"];
+        enumItemLabels = [l10n("Thinking")];
+        enumDescriptions = [l10n("Enable thinking")];
+        defaultEffort = "enabled";
+    }
 
     // Create the entry
     const info: LanguageModelChatInformation = {
@@ -88,6 +105,7 @@ function storeAutoDiscoveredConfig(modelId: string, entry: ModelsDevEntry | unde
     const modalities = entry?.modalities?.input ?? [];
     const hasImage = modalities.includes("image") || modalities.includes("video");
     const vision = entry?.attachment === true || hasImage;
+    const hasReasoning = entry?.reasoning === true;
 
     const config: OpenCodeGoModelItem = {
         id: modelId,
@@ -98,9 +116,9 @@ function storeAutoDiscoveredConfig(modelId: string, entry: ModelsDevEntry | unde
         context_length: entry?.limit?.context ?? DEFAULT_CONTEXT_LENGTH,
         max_completion_tokens: entry?.limit?.output ?? DEFAULT_MAX_TOKENS,
         apiMode: "openai",
-        enable_thinking: true,
-        include_reasoning_in_request: true,
-        thinkingMode: "always",
+        enable_thinking: hasReasoning,
+        include_reasoning_in_request: hasReasoning,
+        thinkingMode: hasReasoning ? "switchable" : "always",
     };
 
     // Keep the entry reference for reference

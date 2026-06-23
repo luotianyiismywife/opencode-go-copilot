@@ -21,6 +21,8 @@ jobs:
       - name: Check for new models
         id: check
         continue-on-error: true
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
           node scripts/check-new-models.mjs > /tmp/check-result.json 2>/tmp/check-stderr.log
           echo "result=$(cat /tmp/check-result.json | jq -c .)" >> $GITHUB_OUTPUT
@@ -43,10 +45,10 @@ jobs:
               "\n" +
               "### New Models\n" +
               "\n" +
-              "| API ID | Name | Context | Max Output | Vision | Reasoning | Tool Call |\n" +
-              "|--------|------|---------|------------|--------|-----------|-----------|\n" +
+              "| API ID | Name | Context | Max Output | Vision | Reasoning | Tool Call | Thinking Mode |\n" +
+              "|--------|------|---------|------------|--------|-----------|-----------|---------------|\n" +
               (.newModelDetails | map(
-                "| `" + (.id // "?") + "` | " + (.name // "?") + " | " + (if .context then (.context | tostring) else "?" end) + " | " + (if .output then (.output | tostring) else "?" end) + " | " + (if .vision then "✅" else "❌" end) + " | " + (if .reasoning then "✅" else "❌" end) + " | " + (if .tool_call then "✅" else "❌" end) + " |"
+                "| `" + (.id // "?") + "` | " + (.name // "?") + " | " + (if .context then (.context | tostring) else "?" end) + " | " + (if .output then (.output | tostring) else "?" end) + " | " + (if .vision then "✅" else "❌" end) + " | " + (if .reasoning then "✅" else "❌" end) + " | " + (if .tool_call then "✅" else "❌" end) + " | " + (.detectedThinkingMode // "?") + " |"
               ) | join("\n")) +
               "\n\n" +
               "### How to Add\n" +

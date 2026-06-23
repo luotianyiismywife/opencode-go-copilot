@@ -89,6 +89,86 @@ async function fetchModelsDevEntry(apiModelId) {
     return null;
 }
 
+/**
+ * Probe a model to detect if it supports thinking (reasoning) toggling.
+ * Sends a minimal request with thinking: { type: "enabled" } and checks the response.
+ *
+ * @returns "switchable" if thinking is supported, "always" if not, "unknown" if probe failed
+ */
+async function probeThinkingSupport(apiKey, modelId, apiMode = "openai") {
+    if (!apiKey) return "unknown";
+
+    const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+    let url, body;
+
+    if (apiMode === "anthropic") {
+        // Anthropic format
+        url = baseUrl.endsWith("/v1") ? `${baseUrl}/messages` : `${baseUrl}/v1/messages`;
+        body = {
+            model: modelId,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+            stream: true,
+            thinking: { type: "enabled" },
+        };
+    } else {
+        // OpenAI format (default)
+        url = `${baseUrl}/chat/completions`;
+        body = {
+            model: modelId,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+            stream: true,
+            thinking: { type: "enabled" },
+        };
+    }
+
+    // Abort quickly — we only need the first response
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+        const headers = apiMode === "anthropic"
+            ? { "x-api-key": apiKey, "Content-Type": "application/json", "anthropic-version": "2023-06-01" }
+            : { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (response.ok) {
+            // Request accepted — model supports thinking parameter
+            // Drain the stream to avoid resource leaks, then return
+            const reader = response.body.getReader();
+            reader.cancel().catch(() => {});
+            return "switchable";
+        }
+
+        if (response.status === 400) {
+            const text = await response.text().catch(() => "");
+            const lowerText = text.toLowerCase();
+            // Check if the error mentions thinking/reasoning not being supported
+            if (lowerText.includes("thinking") || lowerText.includes("reasoning")) {
+                return "always";
+            }
+            // If model not found or other 400, can't determine
+            return "unknown";
+        }
+
+        // Other status codes — can't determine
+        return "unknown";
+    } catch (err) {
+        clearTimeout(timeout);
+        // Timeout or network error — can't determine
+        return "unknown";
+    }
+}
+
 // ── Main ──
 
 async function main() {
@@ -141,6 +221,16 @@ async function main() {
                 try {
                     const entry = await fetchModelsDevEntry(modelId);
                     if (entry) {
+                        // Determine thinking mode from models.dev reasoning field
+                        let thinkingMode;
+                        if (entry.reasoning === true) {
+                            thinkingMode = "switchable";
+                        } else if (entry.reasoning === false) {
+                            thinkingMode = "always";
+                        } else {
+                            thinkingMode = "unknown";
+                        }
+
                         result.newModelDetails.push({
                             id: modelId,
                             name: entry.name ?? modelId,
@@ -149,12 +239,32 @@ async function main() {
                             vision: entry.attachment === true || (entry.modalities?.input ?? []).includes("image"),
                             reasoning: entry.reasoning,
                             tool_call: entry.tool_call,
+                            detectedThinkingMode: thinkingMode,
                         });
                     } else {
-                        result.newModelDetails.push({ id: modelId });
+                        result.newModelDetails.push({ id: modelId, detectedThinkingMode: "unknown" });
                     }
                 } catch {
-                    result.newModelDetails.push({ id: modelId });
+                    result.newModelDetails.push({ id: modelId, detectedThinkingMode: "unknown" });
+                }
+            }
+
+            // Probe thinking support via API if API key is available
+            // This verifies/corrects the models.dev inference
+            if (apiKey && result.newModelDetails.length > 0) {
+                console.error(`[check] Probing thinking support for ${result.newModelDetails.length} model(s)...`);
+                for (const detail of result.newModelDetails) {
+                    // Skip probing if models.dev already says no thinking
+                    if (detail.detectedThinkingMode === "always") {
+                        continue;
+                    }
+                    console.error(`[check]   probing: ${detail.id}...`);
+                    const probed = await probeThinkingSupport(apiKey, detail.id);
+                    if (probed !== "unknown") {
+                        detail.detectedThinkingMode = probed;
+                        detail.thinkingProbed = true;
+                    }
+                    console.error(`[check]     → ${probed}`);
                 }
             }
 
