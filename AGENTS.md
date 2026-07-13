@@ -148,7 +148,8 @@ activate(context)
   │   ├── opencodego.openSettings             ← 打开扩展设置页
   │   ├── opencodego.generateGitCommitMessage ← 生成提交消息
   │   ├── opencodego.abortGitCommitMessage    ← 中止生成
-  │   └── opencodego.setModelPreset           ← 设置模型预设
+  │   ├── opencodego.setModelPreset           ← 设置模型预设
+  │   └── opencodego.setAuthCookie           ← 设置 Auth Cookie 并自动获取 API Key
   ├── showWelcomeIfNeeded()                 ← 首次安装时显示欢迎向导
   └── 注册 dispose 清理
 ```
@@ -371,6 +372,7 @@ generateCommitMsg(secrets, scm?)
 ```
 src/
 ├── apiModelList.ts                       # API 模型列表获取
+├── authCookie.ts                         # Auth Cookie 认证与 API Key 自动获取
 ├── commonApi.ts                          # API 抽象基类
 ├── extension.ts                          # 扩展入口 (activate/deactivate)
 ├── localize.ts                           # 国际化/本地化
@@ -415,10 +417,11 @@ src/
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `extension.ts` | ~210 | 扩展激活/停用，注册 Provider 和 6 条命令，首次安装欢迎页引导 |
-| `provider.ts` | ~700 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程及图片代理多轮循环处理 |
+| `extension.ts` | ~240 | 扩展激活/停用，注册 Provider 和 7 条命令（含 `setAuthCookie`），首次安装欢迎页引导 |
+| `provider.ts` | ~710 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程及图片代理多轮循环处理；`ensureApiKey()` 集成 Cookie 后备自动获取 |
 | `models.ts` | ~230 | 17 个内置模型定义，模型配置查询（所有模型声明 `imageInput: true`） |
 | `types.ts` | ~95 | `OpenCodeGoModelItem`, `ModelPreset`, `ModelsResponse`, `RetryConfig` 等类型 |
+| `authCookie.ts` | ~190 | Auth Cookie 认证与 API Key 自动获取（Cookie 归一化、SSR 数据解析、工作区发现、Key 创建/查找） |
 | `apiModelList.ts` | ~80 | API 模型列表获取：从 `/zen/go/v1/models` 拉取可用模型 ID，5 分钟缓存，静默降级 |
 | `modelsDev.ts` | ~130 | models.dev 元数据拉取与查询：从 `models.dev/models.json` 下载并索引模型规格，支持短 ID 匹配，1 小时缓存 |
 | `commonApi.ts` | ~462 | `CommonApi<TMessage,TRequestBody>` 抽象基类（图片存储、工具调用拦截） |
@@ -427,7 +430,7 @@ src/
 | `utils.ts` | ~285 | 工具函数 (重试、角色映射、工具转换等) |
 | `statusBar.ts` | ~140 | 状态栏创建、更新、累计计数器 |
 | `logger.ts` | ~55 | 日志输出 (LogOutputChannel) |
-| `localize.ts` | ~109 | 中英文国际化 |
+| `localize.ts` | ~125 | 中英文国际化（含 Auth Cookie 相关字符串） |
 | `versionManager.ts` | ~35 | 扩展版本信息 |
 | `openai/openaiApi.ts` | ~613 | OpenAI 格式 API 实现 (消息转换/请求构建/流式处理/图片代理) |
 | `openai/openaiTypes.ts` | ~75 | OpenAI 类型定义 |
@@ -440,6 +443,7 @@ src/
 | `vision/types.ts` | ~53 | Vision proxy 类型定义（`StoredImage`, `InterceptedToolCall`, `ASK_IMAGE_TOOL_DEF`, `ASK_IMAGE_TOOL_NAME`, `ASK_WITH_MULTI_IMAGE_TOOL_DEF`, `ASK_WITH_MULTI_IMAGE_TOOL_NAME`, `DEFAULT_VISION_PROMPT`） |
 | `vision/imageProxy.ts` | ~95 | 图片代理核心：调用视觉模型描述图片（`callVisionModel`/`callVisionModelMulti`），支持 thinking 模式配置和文本流式转发 |
 | `zen/zenModels.ts` | ~256 | Zen 免费模型定义、API 拉取、缓存管理、配置查询（所有模型声明 `imageInput: true`） |
+| `authCookie.ts` | ~190 | Auth Cookie 认证与 API Key 自动获取（Cookie 归一化、SSR 数据解析、工作区发现、Key 创建/查找） |
 
 ---
 
@@ -796,6 +800,52 @@ ask_image 工具定义的 OpenAI 格式（`type: "function"`），包含 `imageI
 
 #### `callVisionModelMulti(images, visionModelId, query, token, progress?): Promise<string>`
 多图版本的视觉模型调用。将多张图片的 `LanguageModelDataPart` 和 query 文本放在同一条消息中发送给视觉模型，使其可以同时看到所有图片进行比较分析。支持流式输出转发。
+
+---
+
+### 4.24 `src/authCookie.ts`
+
+#### `normalizeCookie(cookie: string): string`
+规范化 Auth Cookie 输入。支持 `auth=xxx`、`Cookie: auth=xxx`、裸值 `xxx` 三种格式。
+
+#### `discoverGoWorkspace(cookie: string): Promise<DiscoverResult | undefined>`
+自动发现第一个有 Go 订阅的工作区。流程：
+1. GET `/zh/go` → 从 SSR 中提取当前工作区 ID（`checkLoggedIn` 数据）
+2. GET `/workspace/{wsId}/go` → 从 SSR 提取完整工作区列表
+3. 逐个检测工作区的 Go 订阅状态（`rollingUsage` 是否在 SSR 中）
+4. 返回第一个有 Go 的工作区；若都无 Go 则返回第一个
+
+返回 `{ workspace: WorkspaceRef, hasGo: boolean }`。Cookie 无效时返回 `undefined`。
+
+#### `fetchKeysPage(cookie: string, workspaceId: string): Promise<StoredKey[]>`
+获取工作区的所有 API Key。GET 请求 `/workspace/{wsId}/keys`，从 SSR 数据中解析完整的 Key 值（`{id:"key_xxx",name:"...",key:"sk-..."}`）。
+
+#### `createApiKey(cookie: string, workspaceId: string, keyName?: string): Promise<string | undefined>`
+创建新的 API Key。POST 到 `/_server` 端点（`name=keyName&workspaceID=wsId` 格式），跟随 302 重定向后从最终页 SSR 数据中提取新创建的 Key 值。
+
+#### `fetchOrCreateApiKey(cookie: string, workspaceId: string, keyName?: string): Promise<{ key: string; created: boolean } | undefined>`
+组合操作：先在工作区查找名为 `Vscode_Copilot_Key` 的已有 Key → 若有则直接返回完整值（`created: false`）→ 若没有此名称的 Key 则取第一个可用 Key → 若完全没有 Key 则自动创建（`created: true`）。
+
+#### `getStoredAuthCookie(secrets: SecretStorage): Promise<string | undefined>`
+从 SecretStorage 获取已存储的 Auth Cookie（键 `opencodego.authCookie`）。
+
+#### `storeAuthCookie(secrets: SecretStorage, cookie: string): Promise<void>`
+将 Auth Cookie 规范化后存入 SecretStorage。
+
+#### `deleteAuthCookie(secrets: SecretStorage): Promise<void>`
+从 SecretStorage 删除 Auth Cookie。
+
+#### `getStoredWorkspaceId(secrets: SecretStorage): Promise<string | undefined>`
+从 SecretStorage 获取已存储的工作区 ID（键 `opencodego.workspaceId`）。
+
+#### `storeWorkspaceId(secrets: SecretStorage, workspaceId: string): Promise<void>`
+将工作区 ID 存入 SecretStorage。
+
+#### `getStoredWorkspaceName(secrets: SecretStorage): Promise<string | undefined>`
+从 SecretStorage 获取已存储的工作区名称（键 `opencodego.workspaceName`）。
+
+#### `storeWorkspaceName(secrets: SecretStorage, name: string): Promise<void>`
+将工作区名称存入 SecretStorage。
 
 ---
 

@@ -6,6 +6,16 @@ import { l10n, l10nFormat } from "./localize";
 import type { ModelPreset } from "./types";
 import { abortCommitGeneration, generateCommitMsg } from "./gitCommit/commitMessageGenerator";
 import { TokenizerManager } from "./tokenizer/tokenizerManager";
+import {
+    discoverGoWorkspace,
+    fetchOrCreateApiKey,
+    storeAuthCookie,
+    getStoredAuthCookie,
+    storeWorkspaceId,
+    storeWorkspaceName,
+    deleteWorkspaceId,
+    deleteWorkspaceName,
+} from "./authCookie.js";
 
 // ---- Walkthrough / Welcome constants ----
 
@@ -190,6 +200,97 @@ export function activate(context: vscode.ExtensionContext) {
                         vscode.window.showInformationMessage(
                             l10nFormat("Set to temperature: {0} (custom)", String(tempNum))
                         );
+                    }
+                }
+            }
+        })
+    );
+
+    // ── Auth Cookie commands ──
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("opencodego.setAuthCookie", async () => {
+            const existing = await context.secrets.get("opencodego.authCookie");
+
+            // Step 1: Prompt for cookie
+            const rawCookie = await vscode.window.showInputBox({
+                title: l10n("OpenCode Go Auth Cookie"),
+                prompt: l10n("Paste auth cookie from opencode.ai (F12 → Application → Cookies → auth)"),
+                password: true,
+                ignoreFocusOut: true,
+                value: existing ?? "",
+                placeHolder: "auth=...",
+            });
+            if (rawCookie === undefined) return;
+            if (!rawCookie.trim()) {
+                await context.secrets.delete("opencodego.authCookie");
+                await deleteWorkspaceId(context.secrets);
+                await deleteWorkspaceName(context.secrets);
+                vscode.window.showInformationMessage(l10n("OpenCode Go auth cookie cleared."));
+                return;
+            }
+
+            // Step 2: Store cookie
+            await storeAuthCookie(context.secrets, rawCookie.trim());
+            const cookie = await getStoredAuthCookie(context.secrets);
+            if (!cookie) return;
+
+            // Step 3: Discover workspace and fetch/create API key
+            const result = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: l10n("OpenCode Go: Configuring..."),
+                    cancellable: false,
+                },
+                async () => {
+                    const discover = await discoverGoWorkspace(cookie);
+                    if (!discover) {
+                        return { error: "cookie-invalid" as const };
+                    }
+
+                    const { workspace, hasGo } = discover;
+
+                    // Step 4: Get or create API key
+                    const keyResult = await fetchOrCreateApiKey(cookie, workspace.id);
+                    if (!keyResult) {
+                        return { error: "key-failed" as const };
+                    }
+
+                    // Step 5: Store API key and workspace info
+                    await context.secrets.store("opencodego.apiKey", keyResult.key);
+                    await storeWorkspaceId(context.secrets, workspace.id);
+                    await storeWorkspaceName(context.secrets, workspace.name);
+
+                    return { workspace: workspace.name, hasGo, created: keyResult.created };
+                },
+            );
+
+            // Step 6: Show result notification
+            if ("error" in result) {
+                if (result.error === "cookie-invalid") {
+                    vscode.window.showErrorMessage(l10n("Auth cookie is invalid or expired. Please check and try again."));
+                } else {
+                    vscode.window.showErrorMessage(l10n("Failed to create API key. Please set it manually via 'OpenCode Go: Set API Key'."));
+                }
+            } else {
+                const wsName = result.workspace;
+                const hasGoMsg = result.hasGo ? "" : l10nFormat(" ({0})", l10n("No Go subscription"));
+                const msgKey = result.created ? "Created API key (Vscode_Copilot_Key) in workspace {0}{1}" : "Got API key (Vscode_Copilot_Key) from workspace {0}{1}";
+                vscode.window.showInformationMessage(
+                    l10nFormat(msgKey, wsName, hasGoMsg),
+                );
+
+                // Check if Zen free models are enabled
+                const config = vscode.workspace.getConfiguration();
+                const zenEnabled = config.get<boolean>("opencodego.enableZenFreeModels", false);
+                if (!zenEnabled) {
+                    const action = l10n("Enable Zen Free Models");
+                    const choice = await vscode.window.showInformationMessage(
+                        l10n("💡 Tip: Enable 'opencodego.enableZenFreeModels' to also use free models."),
+                        action,
+                    );
+                    if (choice === action) {
+                        await config.update("opencodego.enableZenFreeModels", true, vscode.ConfigurationTarget.Global);
                     }
                 }
             }

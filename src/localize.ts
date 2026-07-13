@@ -59,6 +59,20 @@ const zhCN: Record<string, string> = {
 	// reasoning effort title (key is English fallback text)
 	"Reasoning Effort": "推理强度",
 
+	// auth cookie
+	"OpenCode Go Auth Cookie": "OpenCode Go 认证 Cookie",
+	"Paste auth cookie from opencode.ai (F12 → Application → Cookies → auth)": "从 opencode.ai 粘贴 auth cookie (F12 → 应用 → Cookie → 复制 auth 的值)",
+	"OpenCode Go auth cookie cleared.": "OpenCode Go 认证 Cookie 已清除。",
+	"OpenCode Go: Configuring...": "OpenCode Go: 正在配置...",
+	"Auth cookie is invalid or expired. Please check and try again.": "Auth Cookie 无效或已过期，请检查后重试。",
+	"Failed to create API key. Please set it manually via 'OpenCode Go: Set API Key'.": "创建 API 密钥失败。请通过「OpenCode Go: 设置 API 密钥」手动设置。",
+	"Got API key (Vscode_Copilot_Key) from workspace {0}{1}": "已从工作区 {0} 获取 Vscode_Copilot_Key{1}",
+	"Created API key (Vscode_Copilot_Key) in workspace {0}{1}": "已从工作区 {0} 创建 Vscode_Copilot_Key{1}",
+	" ({0})": " ({0})",
+	"No Go subscription": "未订阅 Go",
+	"💡 Tip: Enable 'opencodego.enableZenFreeModels' to also use free models.": "💡 建议启用 opencodego.enableZenFreeModels 以使用免费模型",
+	"Enable Zen Free Models": "启用 Zen 免费模型",
+
 	// vision proxy
 	"Querying vision model: \"{0}\"": "正在根据图片提问：{0}",
 	"The image you sent was flagged as sensitive by the content moderation system. Please try a different image.": "您发送的图片被内容审核系统判定为敏感，请尝试更换图片。",

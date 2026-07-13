@@ -76,6 +76,11 @@
 				"command": "opencodego.setModelPreset",
 				"category": "%commandCategory%",
 				"title": "%command.setModelPreset%"
+			},
+			{
+				"command": "opencodego.setAuthCookie",
+				"category": "%commandCategory%",
+				"title": "%command.setAuthCookie%"
 			}
 		],
 		"walkthroughs": [

@@ -918,12 +918,39 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
     }
 
     /**
-     * Ensure an API key exists in SecretStorage, optionally prompting the user when not silent.
+     * Ensure an API key exists in SecretStorage.
+     * If no key is stored but an auth cookie is available, try auto-fetching.
      */
     private async ensureApiKey(): Promise<string | undefined> {
         let apiKey = await this.secrets.get("opencodego.apiKey");
 
         if (!apiKey) {
+            // Try auto-fetch from auth cookie
+            const cookie = await this.secrets.get("opencodego.authCookie");
+            if (cookie?.trim()) {
+                try {
+                    const { getStoredWorkspaceId, discoverGoWorkspace, fetchOrCreateApiKey } = await import("./authCookie.js");
+
+                    // Prefer stored workspace ID; fall back to auto-discovery
+                    let wsId = await getStoredWorkspaceId(this.secrets);
+                    if (!wsId) {
+                        const discover = await discoverGoWorkspace(cookie.trim());
+                        wsId = discover?.workspace.id;
+                    }
+
+                    if (wsId) {
+                        const key = await fetchOrCreateApiKey(cookie.trim(), wsId);
+                        if (key) {
+                            await this.secrets.store("opencodego.apiKey", key.key);
+                            return key.key;
+                        }
+                    }
+                } catch {
+                    // Auto-fetch failed, fall through to manual input
+                }
+            }
+
+            // Fallback: manual input
             const entered = await vscode.window.showInputBox({
                 title: l10n("OpenCode Go Provider API Key"),
                 prompt: l10n("Enter your OpenCode Go API key"),

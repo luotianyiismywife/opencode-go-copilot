@@ -49,6 +49,7 @@
 	"config.enableThirdPartyTokenIndicator.desc": "启用高级 Token 指示器。Copilot 原生 Token 指示器始终保持开启。开启后，扩展还会在 VS Code 状态栏中显示高级Token计数器。默认: 开启。",
 
 	"command.setModelPreset": "设置模型温度预设",
+	"command.setAuthCookie": "设置 Auth Cookie 并自动获取 API Key",
 
 	"walkthrough.title": "OpenCode Go for Copilot Chat",
 	"walkthrough.description": "在 Copilot Chat 中配置 OpenCode Go 模型。",
