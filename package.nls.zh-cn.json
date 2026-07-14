@@ -47,6 +47,7 @@
 	"config.visionProxyModel.desc": "用于 ask_image 工具的视觉模型 ID。当所选模型不支持视觉时，该模型用于回答图片相关问题。",
 	"config.visionProxyThinking.desc": "在视觉代理模型回答图片查询时启用思考/推理功能。",
 	"config.enableThirdPartyTokenIndicator.desc": "启用高级 Token 指示器。Copilot 原生 Token 指示器始终保持开启。开启后，扩展还会在 VS Code 状态栏中显示高级Token计数器。默认: 开启。",
+	"config.enableCommitGeneration.desc": "在源代码管理面板显示生成提交消息按钮。关闭后，魔法棒按钮和命令面板入口将被隐藏。"
 
 	"command.setModelPreset": "设置模型温度预设",
 	"command.setAuthCookie": "设置 Auth Cookie 并自动获取 API Key",

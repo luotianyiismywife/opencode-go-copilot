@@ -47,6 +47,7 @@
 	"config.visionProxyModel.desc": "Vision model ID used by the ask_image tool to answer questions about attached images when the selected model does not support vision.",
 	"config.visionProxyThinking.desc": "Enable thinking/reasoning in the vision proxy model when answering image queries.",
 	"config.enableThirdPartyTokenIndicator.desc": "Enable the Advanced Token indicator in the status bar. The native Copilot token indicator always shows. When this is enabled, the extension also shows an advanced token counter in the VS Code status bar. Default: true.",
+	"config.enableCommitGeneration.desc": "Show the generate commit message button in the SCM panel. When disabled, the magic wand button and the command palette entry are hidden."
 
 	"command.setModelPreset": "Set Model Temperature Preset",
 	"command.setAuthCookie": "Set Auth Cookie & Auto-Fetch API Key",
