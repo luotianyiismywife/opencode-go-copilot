@@ -47,9 +47,13 @@
 	"config.visionProxyModel.desc": "用于 ask_image 工具的视觉模型 ID。当所选模型不支持视觉时，该模型用于回答图片相关问题。",
 	"config.visionProxyThinking.desc": "在视觉代理模型回答图片查询时启用思考/推理功能。",
 	"config.enableThirdPartyTokenIndicator.desc": "启用高级 Token 指示器。Copilot 原生 Token 指示器始终保持开启。开启后，扩展还会在 VS Code 状态栏中显示高级Token计数器。默认: 开启。",
+	"config.enableUsageMonitor.desc": "在状态栏中启用 Go 用量监控。显示 5 小时滚动用量百分比，悬停可查看周和月用量。",
+	"config.usageMonitorInterval.desc": "自动从仪表板刷新用量的间隔（毫秒）。最小值: 60000（1 分钟）。默认: 300000（5 分钟）。",
 
 	"command.setModelPreset": "设置模型温度预设",
 	"command.setAuthCookie": "设置 Auth Cookie 并自动获取 API Key",
+	"command.showGoUsage": "显示 OpenCode Go 用量/配额",
+	"command.refreshGoUsage": "刷新 OpenCode Go 用量",
 
 	"walkthrough.title": "OpenCode Go for Copilot Chat",
 	"walkthrough.description": "在 Copilot Chat 中配置 OpenCode Go 模型。",

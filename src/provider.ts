@@ -31,6 +31,15 @@ import { ASK_IMAGE_TOOL_NAME, ASK_IMAGE_TOOL_DEF, ASK_WITH_MULTI_IMAGE_TOOL_NAME
 import type { InterceptedToolCall, StoredImage } from "./vision/types";
 import { logger } from "./logger";
 import { l10n } from "./localize";
+import {
+    fetchGoUsage,
+    formatGoUsage,
+    formatResetTime,
+    getUsageIcon,
+} from "./usageFetcher";
+import {
+    getStoredWorkspaceId,
+} from "./authCookie";
 
 /**
  * Native Copilot Token Indicator
@@ -85,13 +94,23 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
     /** Track last request completion time for delay calculation. */
     private _lastRequestTime: number | null = null;
 
+    /** Usage monitoring status bar item. */
+    private _usageStatusBarItem: vscode.StatusBarItem;
+    /** Periodic timer for usage refresh. */
+    private _usageTimer: ReturnType<typeof setInterval> | undefined;
+    /** Cached last usage data. */
+    private _lastUsage: import("./usageFetcher").GoUsage | undefined;
+
     /**
      * Create a provider using the given secret storage for the API key.
      */
     constructor(
         private readonly secrets: vscode.SecretStorage,
-        private readonly statusBarItem: vscode.StatusBarItem
-    ) { }
+        private readonly statusBarItem: vscode.StatusBarItem,
+        private readonly usageStatusBarItem: vscode.StatusBarItem
+    ) {
+        this._usageStatusBarItem = usageStatusBarItem;
+    }
 
     /**
      * Create an undici fetch function with custom bodyTimeout to prevent premature
@@ -915,6 +934,112 @@ export class OpenCodeGoChatModelProvider implements LanguageModelChatProvider {
                 clearTimeout(roundTimeoutId);
             }
         }
+    }
+
+    /**
+     * Start the usage monitor (periodic refresh from dashboard).
+     * Called from extension.ts after construction.
+     */
+    public startUsageMonitor(): void {
+        const config = vscode.workspace.getConfiguration();
+        if (!config.get<boolean>("opencodego.enableUsageMonitor", true)) {
+            return;
+        }
+
+        // First check after 3s (let VS Code settle)
+        setTimeout(() => {
+            void this._refreshUsage();
+        }, 3000);
+
+        // Periodic refresh
+        const intervalMs = config.get<number>("opencodego.usageMonitorInterval", 300000);
+        this._usageTimer = setInterval(() => {
+            void this._refreshUsage();
+        }, intervalMs);
+    }
+
+    /**
+     * Stop the usage periodic timer.
+     */
+    public stopUsageMonitor(): void {
+        if (this._usageTimer) {
+            clearInterval(this._usageTimer);
+            this._usageTimer = undefined;
+        }
+    }
+
+    /**
+     * Refresh usage data from SSR and update status bar.
+     */
+    private async _refreshUsage(): Promise<void> {
+        try {
+            const config = vscode.workspace.getConfiguration();
+            if (!config.get<boolean>("opencodego.enableUsageMonitor", true)) {
+                this._usageStatusBarItem.hide();
+                return;
+            }
+
+            const cookie = await this.secrets.get("opencodego.authCookie");
+            const wsId = await getStoredWorkspaceId(this.secrets);
+            if (!cookie || !wsId) {
+                this._usageStatusBarItem.text = "Go: --";
+                this._usageStatusBarItem.tooltip = "No auth cookie configured. Run 'OpenCode Go: Set Auth Cookie'.";
+                this._usageStatusBarItem.show();
+                return;
+            }
+
+            const usage = await fetchGoUsage(cookie, wsId);
+            this._lastUsage = usage;
+
+            const pct = usage.rollingUsage.usagePercent;
+            const icon = getUsageIcon(pct);
+            this._usageStatusBarItem.text = `${icon} Go: ${pct}%`;
+            this._usageStatusBarItem.tooltip =
+                `\uD83D\uDD04 5h Rolling: ${pct}% (resets in ${formatResetTime(usage.rollingUsage.resetInSec)})\n` +
+                `\uD83D\uDCC5 Weekly: ${usage.weeklyUsage.usagePercent}% (resets in ${formatResetTime(usage.weeklyUsage.resetInSec)})\n` +
+                `\uD83D\uDCC6 Monthly: ${usage.monthlyUsage.usagePercent}% (resets in ${formatResetTime(usage.monthlyUsage.resetInSec)})`;
+            this._usageStatusBarItem.show();
+
+            logger.info("usage.refreshed", {
+                workspaceId: wsId,
+                rollingUsage: usage.rollingUsage.usagePercent,
+                weeklyUsage: usage.weeklyUsage.usagePercent,
+                monthlyUsage: usage.monthlyUsage.usagePercent,
+            });
+        } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            logger.warn("usage.refresh-failed", { error: errMsg });
+
+            if (this._lastUsage) {
+                this._usageStatusBarItem.text = "$(warning) Go: ?";
+                this._usageStatusBarItem.tooltip = `Usage refresh failed: ${errMsg}`;
+            } else {
+                this._usageStatusBarItem.text = "Go: --";
+                this._usageStatusBarItem.tooltip = "Usage data unavailable. Configure auth cookie first.";
+            }
+            this._usageStatusBarItem.show();
+        }
+    }
+
+    /**
+     * Public refresh (called from commands or after setAuthCookie).
+     */
+    public async refreshUsage(): Promise<void> {
+        return this._refreshUsage();
+    }
+
+    /**
+     * Get last cached usage data (for showGoUsage command).
+     */
+    public getLastUsage(): import("./usageFetcher").GoUsage | undefined {
+        return this._lastUsage;
+    }
+
+    /**
+     * Dispose usage monitor resources.
+     */
+    public disposeUsageMonitor(): void {
+        this.stopUsageMonitor();
     }
 
     /**

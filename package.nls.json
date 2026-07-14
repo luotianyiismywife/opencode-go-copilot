@@ -47,9 +47,13 @@
 	"config.visionProxyModel.desc": "Vision model ID used by the ask_image tool to answer questions about attached images when the selected model does not support vision.",
 	"config.visionProxyThinking.desc": "Enable thinking/reasoning in the vision proxy model when answering image queries.",
 	"config.enableThirdPartyTokenIndicator.desc": "Enable the Advanced Token indicator in the status bar. The native Copilot token indicator always shows. When this is enabled, the extension also shows an advanced token counter in the VS Code status bar. Default: true.",
+	"config.enableUsageMonitor.desc": "Enable the Go usage monitor in the status bar. Shows the 5h rolling usage percentage. Hover to see weekly and monthly usage.",
+	"config.usageMonitorInterval.desc": "Interval in milliseconds between automatic usage refreshes from the dashboard. Minimum: 60000 (1 minute). Default: 300000 (5 minutes).",
 
 	"command.setModelPreset": "Set Model Temperature Preset",
 	"command.setAuthCookie": "Set Auth Cookie & Auto-Fetch API Key",
+	"command.showGoUsage": "Show OpenCode Go Usage / Quota",
+	"command.refreshGoUsage": "Refresh OpenCode Go Usage",
 
 	"walkthrough.title": "OpenCode Go for Copilot Chat",
 	"walkthrough.description": "Set up OpenCode Go models in Copilot Chat.",

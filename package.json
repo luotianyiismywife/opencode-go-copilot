@@ -81,6 +81,16 @@
 				"command": "opencodego.setAuthCookie",
 				"category": "%commandCategory%",
 				"title": "%command.setAuthCookie%"
+			},
+			{
+				"command": "opencodego.showGoUsage",
+				"category": "%commandCategory%",
+				"title": "%command.showGoUsage%"
+			},
+			{
+				"command": "opencodego.refreshGoUsage",
+				"category": "%commandCategory%",
+				"title": "%command.refreshGoUsage%"
 			}
 		],
 		"walkthroughs": [
@@ -314,6 +324,17 @@
 					"type": "boolean",
 					"default": true,
 					"description": "%config.enableThirdPartyTokenIndicator.desc%"
+				},
+				"opencodego.enableUsageMonitor": {
+					"type": "boolean",
+					"default": true,
+					"description": "%config.enableUsageMonitor.desc%"
+				},
+				"opencodego.usageMonitorInterval": {
+					"type": "number",
+					"default": 300000,
+					"minimum": 60000,
+					"description": "%config.usageMonitorInterval.desc%"
 				}
 			}
 		}

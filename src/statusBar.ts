@@ -132,6 +132,54 @@ export function recordUsage(usage: StreamUsage): void {
     }
 }
 
+// ── Usage Monitor Status Bar ──
+
+let _usageStatusBarItem: vscode.StatusBarItem | undefined;
+
+/**
+ * Initialize the usage monitor status bar item.
+ * Placed left of the token counter (lower priority = 101 vs token's 100).
+ */
+export function initUsageStatusBar(context: vscode.ExtensionContext): vscode.StatusBarItem {
+    const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
+    item.name = "OpenCode Go Quota Usage";
+    item.text = "Go: --";
+    item.tooltip = "OpenCode Go quota usage. Configure auth cookie to enable.";
+    item.command = "opencodego.showGoUsage";
+    context.subscriptions.push(item);
+    _usageStatusBarItem = item;
+    return item;
+}
+
+/**
+ * Update the usage status bar text and tooltip.
+ */
+export function updateUsageStatusBar(
+    text: string,
+    tooltip: string,
+    show: boolean
+): void {
+    if (!_usageStatusBarItem) return;
+    _usageStatusBarItem.text = text;
+    _usageStatusBarItem.tooltip = tooltip;
+    if (show) {
+        _usageStatusBarItem.show();
+    } else {
+        _usageStatusBarItem.hide();
+    }
+}
+
+/**
+ * Show/hide the usage status bar.
+ */
+export function showUsageStatusBar(): void {
+    _usageStatusBarItem?.show();
+}
+
+export function hideUsageStatusBar(): void {
+    _usageStatusBarItem?.hide();
+}
+
 /**
  * Update the status bar tooltip with cumulative input/output token counts
  * and DeepSeek cache info (if available).

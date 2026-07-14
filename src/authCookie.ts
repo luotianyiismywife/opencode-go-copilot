@@ -25,6 +25,11 @@ const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
  */
 const KEY_SERVER_ID = "444825072757feb3b2ec98a3260e2c32488cb05899076c0afb36b9eb5142bc62";
 
+/**
+ * _server ID for fetching workspace refs list (used by usageFetcher).
+ */
+export const WORKSPACE_SERVER_ID = "def39973159c7f0483d8793a822b8dbb10d067e12c65455fcb4608459ba0234f";
+
 const SECRET_COOKIE_KEY = "opencodego.authCookie";
 const SECRET_WORKSPACE_KEY = "opencodego.workspaceId";
 const SECRET_WORKSPACE_NAME_KEY = "opencodego.workspaceName";
@@ -134,7 +139,7 @@ async function getWorkspaceIdFromGoPage(cookie: string): Promise<string | undefi
 /**
  * Step 2: Fetch a workspace's /go page to get the full workspace list from SSR.
  */
-async function fetchWorkspaceRefs(cookie: string, workspaceId: string): Promise<WorkspaceRef[]> {
+export async function fetchWorkspaceRefs(cookie: string, workspaceId: string): Promise<WorkspaceRef[]> {
     const html = await fetchText(
         `${OPEnCODE_BASE}/workspace/${encodeURIComponent(workspaceId)}/go`,
         cookie,

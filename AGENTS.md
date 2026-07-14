@@ -49,6 +49,7 @@
 | **立即取消** | 取消请求时通过 `reader.cancel()` 立即中断流式读取，停止后台接收 |
 | **视觉代理配置** | 支持通过设置 `opencodego.visionProxyModel`、`opencodego.visionProxyThinking` 配置图片代理所使用的视觉模型和思考模式。`opencodego.visionProxyThinking` 默认关闭，关闭时内部请求通过 `modelOptions.thinking={ type: false }` / `reasoning_effort="disabled"` 禁用视觉模型思考，最终 OpenAI 兼容请求体发送 `thinking: { type: false }` |
 | **安装欢迎页 (Walkthrough)** | 首次安装且未配置 API Key 时自动打开引导向导，指引用户设置 API Key 和打开语言模型管理器。包含 3 个步骤：设置 API Key、显示模型、高级设置。通过 `onStartupFinished` 激活事件确保在 VS Code 启动后立即检测 |
+| **用量监控** | 通过 Auth Cookie 从 OpenCode AI 仪表板 SSR 数据中自动获取 Go 订阅的 5 小时/周/月用量配额数据。状态栏实时显示 5 小时滚动用量百分比，悬停显示三档完整详情（含重置倒计时）。支持 5 分钟自动刷新（可配置间隔），切换工作区或设置 Auth Cookie 后自动拉取。可通过 `opencodego.enableUsageMonitor` 开关控制 |
 
 ### 1.3 模型清单
 
@@ -417,8 +418,8 @@ src/
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `extension.ts` | ~240 | 扩展激活/停用，注册 Provider 和 7 条命令（含 `setAuthCookie`），首次安装欢迎页引导 |
-| `provider.ts` | ~710 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程及图片代理多轮循环处理；`ensureApiKey()` 集成 Cookie 后备自动获取 |
+| `extension.ts` | ~240 | 扩展激活/停用，注册 Provider 和 9 条命令（含 `setAuthCookie`、`showGoUsage`、`refreshGoUsage`），用量监控启动与配置监听，首次安装欢迎页引导 |
+| `provider.ts` | ~800 | 实现 `LanguageModelChatProvider`，处理聊天请求全流程及图片代理多轮循环处理；`ensureApiKey()` 集成 Cookie 后备自动获取；用量监控定时刷新与状态栏管理 |
 | `models.ts` | ~230 | 17 个内置模型定义，模型配置查询（所有模型声明 `imageInput: true`） |
 | `types.ts` | ~95 | `OpenCodeGoModelItem`, `ModelPreset`, `ModelsResponse`, `RetryConfig` 等类型 |
 | `authCookie.ts` | ~190 | Auth Cookie 认证与 API Key 自动获取（Cookie 归一化、SSR 数据解析、工作区发现、Key 创建/查找） |
@@ -443,7 +444,8 @@ src/
 | `vision/types.ts` | ~53 | Vision proxy 类型定义（`StoredImage`, `InterceptedToolCall`, `ASK_IMAGE_TOOL_DEF`, `ASK_IMAGE_TOOL_NAME`, `ASK_WITH_MULTI_IMAGE_TOOL_DEF`, `ASK_WITH_MULTI_IMAGE_TOOL_NAME`, `DEFAULT_VISION_PROMPT`） |
 | `vision/imageProxy.ts` | ~95 | 图片代理核心：调用视觉模型描述图片（`callVisionModel`/`callVisionModelMulti`），支持 thinking 模式配置和文本流式转发 |
 | `zen/zenModels.ts` | ~256 | Zen 免费模型定义、API 拉取、缓存管理、配置查询（所有模型声明 `imageInput: true`） |
-| `authCookie.ts` | ~190 | Auth Cookie 认证与 API Key 自动获取（Cookie 归一化、SSR 数据解析、工作区发现、Key 创建/查找） |
+| `usageFetcher.ts` | ~145 | Go 订阅用量获取与格式化：从仪表板 SSR 数据解析 5 小时/周/月三档用量配额，支持进度条格式化和重置倒计时 |
+| `authCookie.ts` | ~200 | Auth Cookie 认证与 API Key 自动获取（Cookie 归一化、SSR 数据解析、工作区发现、Key 创建/查找）；导出 `WORKSPACE_SERVER_ID` 和 `fetchWorkspaceRefs` 供用量模块使用 |
 
 ---
 
@@ -470,9 +472,12 @@ src/
 | 属性 | 类型 | 说明 |
 |------|------|------|
 | `_lastRequestTime` | `number \| null` | 上次请求完成时间，用于延迟计算 |
+| `_usageStatusBarItem` | `vscode.StatusBarItem` | 用量监控状态栏条目，显示 `Go: xx%` |
+| `_usageTimer` | `ReturnType<typeof setInterval> \| undefined` | 用量定时刷新器 |
+| `_lastUsage` | `GoUsage \| undefined` | 缓存的上次用量数据 |
 
-#### `constructor(secrets: vscode.SecretStorage, statusBarItem: vscode.StatusBarItem)`
-构造函数，接收密钥存储和状态栏条目。
+#### `constructor(secrets: vscode.SecretStorage, statusBarItem: vscode.StatusBarItem, usageStatusBarItem: vscode.StatusBarItem)`
+构造函数，接收密钥存储、Token 状态栏条目和用量状态栏条目。
 
 #### `private _createFetchWithTimeout(requestTimeoutMs: number): typeof fetch`
 创建 undici fetch 实例，设置自定义 `bodyTimeout` 防止流式响应中 TCP 空闲连接被提前关闭。回退到全局 `fetch`。
@@ -496,6 +501,24 @@ src/
 - 第二轮及后续轮次请求体中显式设置 `tool_choice` 为 `"auto"`（OpenAI）或 `{ type: "auto" }`（Anthropic），确保模型可继续调用工具。
 - 使用 `_resetStreamState()` 重置流状态，避免 `_completedToolCallIndices` 等状态在轮次间残留导致工具调用被跳过。
 - `thinking` 字段值统一使用字符串（`"enabled"` / `"disabled"`），与 `prepareRequestBody` 保持一致。
+
+#### `public startUsageMonitor(): void`
+启动用量监控。读取 `opencodego.enableUsageMonitor` 配置（默认开启），3 秒后首次拉取，随后按 `opencodego.usageMonitorInterval`（默认 5 分钟）周期刷新。
+
+#### `public stopUsageMonitor(): void`
+停止用量定时刷新器。
+
+#### `private async _refreshUsage(): Promise<void>`
+从 SecretStorage 获取 Auth Cookie 和工作区 ID，调用 `fetchGoUsage()` 拉取用量数据，更新 `_usageStatusBarItem` 文本和 tooltip。主文本显示 `{icon} Go: {rolling}%`，tooltip 显示三档用量百分比和重置倒计时。失败时显示 `Go: --` 或 `$(warning) Go: ?`。
+
+#### `public async refreshUsage(): Promise<void>`
+公开刷新方法，委托给 `_refreshUsage()`。由命令或 `setAuthCookie` 成功后调用。
+
+#### `public getLastUsage(): GoUsage | undefined`
+返回缓存的用量数据，供 `showGoUsage` 命令展示详细信息。
+
+#### `public disposeUsageMonitor(): void`
+释放用量监控资源（停止定时器）。
 
 #### `private async ensureApiKey(): Promise<string | undefined>`
 确保 API Key 存在于 SecretStorage 中，缺失时弹出输入框提示用户输入。
@@ -871,6 +894,46 @@ ask_image 工具定义的 OpenAI 格式（`type: "function"`），包含 `imageI
 
 #### `updateCumulativeTooltip(statusBarItem): void`
 更新状态栏工具提示，显示累计输入/输出 Token 数和缓存命中率。
+
+#### `initUsageStatusBar(context): vscode.StatusBarItem`
+初始化用量监控状态栏条目（`vscode.StatusBarAlignment.Right`, 优先级 101，位于 Token 指示器左侧）。默认显示 `Go: --`，绑定 `opencodego.showGoUsage` 命令。
+
+#### `updateUsageStatusBar(text, tooltip, show): void`
+更新用量状态栏的文本、工具提示和可见性。
+
+#### `showUsageStatusBar() / hideUsageStatusBar(): void`
+显示/隐藏用量状态栏条目。
+
+---
+
+### 4.25 `src/usageFetcher.ts`
+
+#### `interface UsageWindow`
+`{ status: "ok" | "rate-limited"; usagePercent: number; resetInSec: number }` — 单个用量窗口，包含状态、使用百分比和重置倒计时。
+
+#### `interface GoUsage`
+`{ rollingUsage: UsageWindow; weeklyUsage: UsageWindow; monthlyUsage: UsageWindow; fetchedAt: string; workspaceId: string }` — 完整用量快照，包含三档用量窗口、获取时间和工作区 ID。
+
+#### `interface WorkspaceRef`
+`{ id: string; name: string; slug: string | null }` — 工作区引用。
+
+#### `fetchGoUsage(authCookie, workspaceId): Promise<GoUsage>`
+从 `https://opencode.ai/workspace/{wsId}/go` 的 SSR HTML 中解析三档用量数据。使用 `RE_USAGE_WINDOW` 正则提取 `rollingUsage`/`weeklyUsage`/`monthlyUsage` 的 `status`、`resetInSec`、`usagePercent`。Cookie 失效时抛出 `"cookie-rejected"`。
+
+#### `fetchWorkspaceRefs(authCookie): Promise<WorkspaceRef[]>`
+通过 `_server?id=WORKSPACE_SERVER_ID`（`def39973...`）获取工作区引用列表。
+
+#### `formatResetTime(seconds: number): string`
+格式化重置倒计时：秒 → `4h 51m` / `5d 13h` / `30d` / `now`。
+
+#### `formatGoUsage(usage: GoUsage): string`
+格式化完整用量信息为多行字符串（含彩色进度条），用于 tooltip 或通知显示。
+
+#### `formatWindow(label: string, w: UsageWindow): string`
+格式化单档用量窗口为单行（进度条 + 百分比 + 状态 + 重置倒计时）。
+
+#### `getUsageIcon(percent: number): string`
+根据用量百分比返回 VS Code 图标：`$(check)`（<70%，绿色）、`$(warning)`（70-89%，黄色）、`$(error)`（≥90%，红色）。
 
 ---
 

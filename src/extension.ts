@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { OpenCodeGoChatModelProvider } from "./provider";
-import { initStatusBar } from "./statusBar";
+import { initStatusBar, initUsageStatusBar } from "./statusBar";
 import { logger } from "./logger";
 import { l10n, l10nFormat } from "./localize";
 import type { ModelPreset } from "./types";
@@ -16,6 +16,7 @@ import {
     deleteWorkspaceId,
     deleteWorkspaceName,
 } from "./authCookie.js";
+import { formatGoUsage } from "./usageFetcher.js";
 
 // ---- Walkthrough / Welcome constants ----
 
@@ -33,7 +34,8 @@ export function activate(context: vscode.ExtensionContext) {
     TokenizerManager.initialize(context.extensionPath);
 
     const tokenCountStatusBarItem: vscode.StatusBarItem = initStatusBar(context);
-    const provider = new OpenCodeGoChatModelProvider(context.secrets, tokenCountStatusBarItem);
+    const usageStatusBarItem: vscode.StatusBarItem = initUsageStatusBar(context);
+    const provider = new OpenCodeGoChatModelProvider(context.secrets, tokenCountStatusBarItem, usageStatusBarItem);
 
     // Register the OpenCode Go provider under the vendor id used in package.json
     vscode.lm.registerLanguageModelChatProvider("opencodego", provider);
@@ -293,9 +295,80 @@ export function activate(context: vscode.ExtensionContext) {
                         await config.update("opencodego.enableZenFreeModels", true, vscode.ConfigurationTarget.Global);
                     }
                 }
+
+                // Refresh usage now that we have a cookie + workspace
+                void provider.refreshUsage();
             }
         })
     );
+
+    // ── Usage Monitor Commands ──
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("opencodego.showGoUsage", async () => {
+            const usage = provider.getLastUsage();
+            if (!usage) {
+                const cookie = await context.secrets.get("opencodego.authCookie");
+                if (!cookie) {
+                    vscode.window.showInformationMessage(
+                        "No usage data available. Configure an auth cookie first via 'OpenCode Go: Set Auth Cookie'."
+                    );
+                    return;
+                }
+                await provider.refreshUsage();
+                const freshUsage = provider.getLastUsage();
+                if (!freshUsage) {
+                    vscode.window.showWarningMessage("Failed to fetch usage data. Check your auth cookie.");
+                    return;
+                }
+                vscode.window.showInformationMessage(
+                    formatGoUsage(freshUsage),
+                    { modal: false }
+                );
+                return;
+            }
+            vscode.window.showInformationMessage(
+                formatGoUsage(usage),
+                { modal: false }
+            );
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("opencodego.refreshGoUsage", async () => {
+            await provider.refreshUsage();
+            const usage = provider.getLastUsage();
+            if (usage) {
+                vscode.window.showInformationMessage(
+                    `Usage refreshed: 5h ${usage.rollingUsage.usagePercent}% | Weekly ${usage.weeklyUsage.usagePercent}% | Monthly ${usage.monthlyUsage.usagePercent}%`
+                );
+            }
+        })
+    );
+
+    // Start usage monitor (periodic dashboard refresh)
+    provider.startUsageMonitor();
+
+    // Listen for config changes to enable/disable usage monitor
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration("opencodego.enableUsageMonitor") ||
+                event.affectsConfiguration("opencodego.usageMonitorInterval")) {
+                if (vscode.workspace.getConfiguration().get<boolean>("opencodego.enableUsageMonitor", true)) {
+                    provider.startUsageMonitor();
+                    void provider.refreshUsage();
+                } else {
+                    provider.stopUsageMonitor();
+                    usageStatusBarItem.hide();
+                }
+            }
+        })
+    );
+
+    // Dispose usage monitor on deactivate
+    context.subscriptions.push({
+        dispose: () => provider.disposeUsageMonitor(),
+    });
 
     // Show welcome walkthrough on first install (when no API key is configured)
     showWelcomeIfNeeded(context);
